@@ -31,7 +31,7 @@ Ordered Maps behave the same as other maps, but are only created using the `orde
 (assoc (dissoc m :c) :c 7) ;; => {:a 1, :b 2, :d 4, :e 5, :c 7}
 ```
 ## TODO
-- Hashmaps
+- Ordered sets
 - Remove the first underlying hashmap
 
 ## License
