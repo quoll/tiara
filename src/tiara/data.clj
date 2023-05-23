@@ -106,5 +106,5 @@
        kv-vec
        (apply hash-map (interleave (map first kv-vec) (range)))))))
 
-(def ^:const EMPTY_MAP (vec-map))
+(def EMPTY_MAP (vec-map))
 
