@@ -85,6 +85,8 @@
       (putAll [m] (throw (UnsupportedOperationException.)))
       (remove [k] (throw (UnsupportedOperationException.))))))
 
+(def EMPTY_MAP (vec-map))
+
 (defn vreverse
   "Reverses a vector into a vector. Lists are reversed as usual."
   [v]
@@ -94,7 +96,7 @@
 
 (defn ordered-map
   "Returns a map object that remembers the insertion order, similarly to a java.util.LinkedHashMap"
-  ([] (vec-map))
+  ([] EMPTY_MAP)
   ([& keyvals]
    (let [kv-vec (vreverse
                   (second
@@ -105,6 +107,4 @@
      (vec-map
        kv-vec
        (apply hash-map (interleave (map first kv-vec) (range)))))))
-
-(def EMPTY_MAP (vec-map))
 
