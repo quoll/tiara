@@ -32,7 +32,6 @@ Ordered Maps behave the same as other maps, but are only created using the `orde
 ```
 ## TODO
 - Ordered sets
-- Remove the first underlying hashmap
 
 ## License
 
