@@ -6,7 +6,7 @@ A small data structure library.
 Add the following dependency to the :deps map in deps.edn:
 
 ```clojure
-io.github.quoll/tiara {:git/tag "v0.0.1" :git/sha "52844a7"}
+io.github.quoll/tiara {:git/tag "v0.0.1" :git/sha "90407e7"}
 ```
 
 ## Usage
