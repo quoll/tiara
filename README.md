@@ -6,11 +6,11 @@ A small data structure library.
 Add the following dependency to the :deps map in deps.edn:
 
 ```clojure
-io.github.quoll/tiara {:git/tag "v0.0.1" :git/sha "90407e7"}
+io.github.quoll/tiara {:git/tag "v0.1.0" :git/sha "500bad1"}
 ```
 
 ## Usage
-At this point, Tiara only includes an ordered map. This has the same O(1) access characteristics as a hashmap, but maintains insertion order.
+At this point, Tiara only includes an ordered map. This has the same O(1) access characteristics as a hashmap, but maintains insertion order. However, `dissoc` will be o(n) in the worst case.
 
 Ordered Maps behave the same as other maps, but are only created using the `ordered-map` function.
 
