@@ -44,7 +44,7 @@
 (deftest test-conj
   (testing "equivalence of maps constructed using conj"
     (let [kvs (shuffle (map (juxt make-key identity) (range 20)))]
-      (is (= (reduce conj (ordered-map) kvs)
+      (is (= (reduce conj EMPTY_MAP kvs)
              (reduce conj (hash-map) kvs))))))
 
 (deftest test-dissoc
@@ -71,13 +71,13 @@
 (deftest test-keys
   (testing "keys returns the correct order"
     (let [kvs (shuffle (map (juxt make-key identity) (range 20)))
-          mp (reduce conj (ordered-map) kvs) ]
+          mp (reduce conj EMPTY_MAP kvs) ]
       (is (= (keys mp) (map first kvs))))))
 
 (deftest test-vals
   (testing "vals returns the correct order"
     (let [kvs (shuffle (map (juxt make-key identity) (range 20)))
-          mp (reduce conj (ordered-map) kvs) ]
+          mp (reduce conj EMPTY_MAP kvs) ]
       (is (= (vals mp) (map second kvs))))))
 
 
