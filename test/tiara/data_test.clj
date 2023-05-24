@@ -1,6 +1,6 @@
 (ns tiara.data-test
   (:require [clojure.test :refer [deftest testing is]]
-            [tiara.data :refer [ordered-map EMPTY_MAP]]))
+            [tiara.data :refer [ordered-map EMPTY_MAP ordered-set oset EMPTY_SET]]))
 
 (defn make-key [n] (keyword (str "k" n)))
 
@@ -61,6 +61,13 @@
       (doseq [n (shuffle (range 20))]
         (is (= n (get mp (make-key n))))))))
 
+(deftest test-invoke
+  (testing "invoke works as expected"
+    (is (= 2 ((ordered-map :a 1 :b 2) :b)))
+    (let [mp (make-map ordered-map)]
+      (doseq [n (shuffle (range 20))]
+        (is (= n (mp (make-key n))))))))
+
 (deftest test-find
   (testing "find works as expected"
     (is (= [:b 2] (find (ordered-map :a 1 :b 2) :b)))
@@ -81,4 +88,66 @@
       (is (= (vals mp) (map second kvs))))))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Set testing
 
+(defn krange [n] (map make-key (range n)))
+
+(deftest test-set-equiv
+  (testing "set equivalence for constructed sets"
+    (is (= (apply ordered-set (range 8))
+           (set (range 8))))
+    (is (= (set (range 8))
+           (apply ordered-set (range 8))))
+    (is (= (apply ordered-set (range 20))
+           (apply hash-set (range 20))))
+    (is (= (apply hash-set (range 20))
+           (apply ordered-set (range 20)))))
+  (testing "set equivalence for constructed sets with keyword entries"
+    (is (= (apply ordered-set (krange 8))
+           (set (krange 8))))
+    (is (= (set (krange 8))
+           (apply ordered-set (krange 8))))
+    (is (= (apply ordered-set (krange 20))
+           (apply hash-set (krange 20))))
+    (is (= (apply hash-set (krange 20))
+           (apply ordered-set (krange 20))))))
+
+(deftest test-set-seq
+  (testing "seq functionality of a set"
+    (is (= (krange 20)
+           (seq (oset (krange 20)))))))
+
+(defn make-set-conj [st]
+  (reduce conj (st) (shuffle (krange 20))))
+
+(deftest test-conj
+  (testing "equivalence of sets constructed using conj"
+    (is (= #{:a :b} (conj (ordered-set :a) :b)))
+    (is (= (make-set-conj hash-set)
+           (make-set-conj ordered-set)))
+    (is (= (make-set-conj ordered-set)
+           (make-set-conj hash-set)))))
+
+(deftest test-disj
+  (testing "disj works equivalently to hashset"
+    (is (= #{:a} (disj (ordered-set :a :b) :b)))
+    (let [rms (take 8 (shuffle (krange 20)))]
+      (is (= (reduce disj (oset (krange 20)) rms)
+             (reduce disj (set (krange 20)) rms))))))
+
+(deftest test-set-get
+  (testing "get works on sets as expected"
+    (is (= :b (get (ordered-set :a :b) :b)))
+    (let [s (oset (krange 20))]
+      (doseq [n (shuffle (range 20))]
+        (is (= (make-key n) (get s (make-key n))))
+        (is (nil? (get s (make-key (+ 20 n)))))))))
+
+(deftest test-set-invoke
+  (testing "invoke works on sets as expected"
+    (is (= :b ((ordered-set :a :b) :b)))
+    (let [s (oset (krange 20))]
+      (doseq [n (shuffle (range 20))]
+        (is (= (make-key n) (s (make-key n))))
+        (is (nil? (s (make-key (+ 20 n)))))))))

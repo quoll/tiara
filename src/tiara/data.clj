@@ -118,9 +118,15 @@
       (withMeta [meta] (vec-set (with-meta s meta)))
       (meta [] (meta s)))))
 
+(def EMPTY_SET (vec-set))
 
 (defn ordered-set
   "Creates a set object that remembers the insertion order, similarly to a java.util.LinkedHashSet"
-  ([] (vec-set))
+  ([] EMPTY_SET)
   ([& s]
-   (vec-set (apply ordered-map (mapcat (juxt identity identity) s)))))
+   (vec-set (apply ordered-map (mapcat #(repeat 2 %) s)))))
+
+(defn oset
+  "Convenience function to create an ordered set from a seq"
+  [s]
+  (apply ordered-set s))
