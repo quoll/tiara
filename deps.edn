@@ -11,5 +11,7 @@
    :main-opts ["--main"    "cljs.main"
                "--repl-env" "node"
                "-i" "test/quoll/tiara/data_test.clj"]  ;; execute with clj -M:test-cljs
-  }
-  :neil {:project {:name quoll/tiara}}}
+  :build {:deps {io.github.seancorfield/build-clj
+                 {:git/tag "v0.8.2" :git/sha "0ffdb4c"}}
+          :ns-default build}
+  :neil {:project {:name quoll/tiara}}}}

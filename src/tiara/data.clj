@@ -1,7 +1,8 @@
 (ns ^{:doc "Divergent data structures"
       :author "Paula Gearon"}
   tiara.data
-  (:import [clojure.lang AFn APersistentMap MapEntry IPersistentMap IHashEq IObj MapEquivalence]
+  (:import [clojure.lang AFn APersistentMap APersistentSet MapEntry
+            IPersistentMap IHashEq IObj MapEquivalence]
            [java.util Map]))
 
 (def ^:const magic 7)
@@ -79,11 +80,7 @@
       (keySet [] (map key lst))
       (values [] (map val lst))
       (withMeta [meta] (vec-map lst (with-meta idx meta)))
-      (meta [] (meta idx))
-      (clear [] (throw (UnsupportedOperationException.)))
-      (put [k v] (throw (UnsupportedOperationException.)))
-      (putAll [m] (throw (UnsupportedOperationException.)))
-      (remove [k] (throw (UnsupportedOperationException.))))))
+      (meta [] (meta idx)))))
 
 (def EMPTY_MAP (vec-map))
 
@@ -94,8 +91,9 @@
     (mapv #(nth v %) (range (dec (count v)) -1 -1))
     (reverse v)))
 
+
 (defn ordered-map
-  "Returns a map object that remembers the insertion order, similarly to a java.util.LinkedHashMap"
+  "Creates a map object that remembers the insertion order, similarly to a java.util.LinkedHashMap"
   ([] EMPTY_MAP)
   ([& keyvals]
    (let [kv-vec (vreverse
@@ -108,3 +106,21 @@
        kv-vec
        (apply hash-map (interleave (map first kv-vec) (range)))))))
 
+(defn- vec-set
+  "Creates an object that implements the required set interfaces."
+  ([] (vec-set EMPTY_MAP))
+  ([s]
+    (proxy [APersistentSet IObj Debug] [s]
+      (dp [] (.dp s))
+      (disjoin [key] (vec-set (dissoc s key)))
+      (cons [o] (vec-set (assoc s o o)))
+      (empty [] (vec-set))
+      (withMeta [meta] (vec-set (with-meta s meta)))
+      (meta [] (meta s)))))
+
+
+(defn ordered-set
+  "Creates a set object that remembers the insertion order, similarly to a java.util.LinkedHashSet"
+  ([] (vec-set))
+  ([& s]
+   (vec-set (apply ordered-map (mapcat (juxt identity identity) s)))))
