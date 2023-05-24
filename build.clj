@@ -4,7 +4,7 @@
             [org.corfield.build :as bb]))
 
 (def lib 'org.clojars.quoll/tiara)
-(def version "0.1.1")
+(def version "0.2.0")
 
 ;; clojure -X:build
 (defn test "Run the tests." [opts]
