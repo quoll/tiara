@@ -2,6 +2,8 @@
   (:require [clojure.test :refer [deftest testing is]]
             [tiara.data :refer [ordered-map EMPTY_MAP ordered-set oset EMPTY_SET]]))
 
+(set! *warn-on-reflection* true)
+
 (defn make-key [n] (keyword (str "k" n)))
 
 (defn make-kv-range [n] (interleave (map make-key (range n)) (range n)))

@@ -1,11 +1,12 @@
 (ns ^{:doc "Divergent data structures"
       :author "Paula Gearon"}
   tiara.data
-  (:import [clojure.lang AFn APersistentMap APersistentSet MapEntry
-            IPersistentMap IHashEq IObj MapEquivalence]
-           [java.util Map]))
+  (:import [clojure.lang IFn APersistentMap APersistentSet MapEntry ISeq
+            IPersistentMap IPersistentSet IHashEq IObj MapEquivalence]
+           [java.util Map Set Collection]))
 
 (def ^:const magic 7)
+(def ^:const set-magic 11)
 
 (definline indirect
   "This get operation is used in multiple places, and can be inlined.
@@ -21,68 +22,74 @@
      (val (nth ~entry-vector n#))
      ~not-found))
 
-(definterface Debug
-  (dp []))
+(deftype VecMap [lst idx]
+  IFn
+  (invoke [this k] (indirect idx lst k))
+  (invoke [this k not-found] (indirect-nf idx lst k not-found))
+  (invoke [this a b & rest] (throw (UnsupportedOperationException.)))
+  (applyTo [this s] (case (count s)
+                      1 (indirect idx lst (first s))
+                      2 (indirect-nf idx lst (first s) (second s))
+                      (throw (clojure.lang.ArityException. (count s) "Map.invoke"))))
 
-(defn- vec-map
-  "Creates an object that implements the required map interfaces, implemented by wrapping
-  a hashmap and a vector. This does not extend the abstract class APersistentMap as this
-  includes lots of functionality that would be duplicated by the wrapped objects."
-  ([] (vec-map [] {}))
-  ([lst idx]
-    (proxy [AFn IPersistentMap IHashEq IObj MapEquivalence Map Debug] []
-      (assoc [k v]
-        (if-let [n (idx k)]
-          (if (= (val (nth lst n)) v)
-            this
-            (vec-map (assoc lst n (MapEntry/create k v)) idx))
-          (vec-map (conj lst (MapEntry/create k v)) (assoc idx k (count lst)))))
-      (assocEx [k v]
-        (if (contains? idx k)
-          (throw (ex-info "Key already present" {:key k}))
-          (.assoc this k v)))
-      (dp []
-        (println " lst:" lst)
-        (println " idx:" idx))
-      (without [k]
-        (if-let [split (get idx k)]
-          (vec-map (into (subvec lst 0 split) (subvec lst (inc split)))
-                   (reduce (fn [index n]
-                             (let [k (key (nth lst n))]
-                               (update index k dec)))
-                           (dissoc idx k)
-                           (range (inc split) (count lst))))
-          this))
-      (containsKey [k] (contains? idx k))
-      (entryAt [k] (when-let [n (idx k)] (nth lst n)))
-      (count [] (count lst))
-      (iterator [] (.iterator lst))
-      (cons [[k v]] (.assoc this k v))
-      (empty [] (vec-map))
-      (equiv [o]
-        (if (instance? IPersistentMap o)
-          (and (instance? MapEquivalence o) (APersistentMap/mapEquals this o))
-          (APersistentMap/mapEquals this o)))
-      (valAt
-        ([k] (indirect idx lst k))
-        ([k not-found] (indirect-nf idx lst k not-found)))
-      (seq [] (seq lst))
-      (hasheq [] (+ magic (.hasheq lst)))
-      (invoke
-        ([k] (indirect idx lst k))
-        ([k not-found] (indirect-nf idx lst k not-found)))
-      (containsValue [v] (some #(= % v) (map val lst)))
-      (equals [o] (.equiv this o))
-      (get [k] (indirect idx lst k))
-      (isEmpty [] (empty? lst))
-      (size [] (count lst))
-      (hashCode [] (+ magic (hash lst)))
-      (keySet [] (map key lst))
-      (values [] (map val lst))
-      (withMeta [meta] (vec-map lst (with-meta idx meta)))
-      (meta [] (meta idx)))))
+  IPersistentMap
+  (assoc [this k v]
+    (if-let [n (idx k)]
+      (if (= (val (nth lst n)) v)
+        this
+        (VecMap. (assoc lst n (MapEntry/create k v)) idx))
+      (VecMap. (conj lst (MapEntry/create k v)) (assoc idx k (count lst)))))
+  (assocEx [this k v]
+    (if (contains? idx k)
+      (throw (ex-info "Key already present" {:key k}))
+      (.assoc this k v)))
+  (without [this k]
+    (if-let [split (get idx k)]
+      (VecMap. (into (subvec lst 0 split) (subvec lst (inc split)))
+               (reduce (fn [index n]
+                         (let [k (key (nth lst n))]
+                           (update index k dec)))
+                       (dissoc idx k)
+                       (range (inc split) (count lst))))
+      this))
+  (iterator [this] (.iterator ^Collection (seq this)))
+  (containsKey [this k] (contains? idx k))
+  (entryAt [this k] (when-let [n (idx k)] (nth lst n)))
+  (count [this] (count lst))
+  (cons [this [k v]] (.assoc this k v))
+  (empty [this] (VecMap. [] {}))
+  (equiv [this o]
+    (if (instance? IPersistentMap o)
+      (and (instance? MapEquivalence o) (APersistentMap/mapEquals this o))
+      (APersistentMap/mapEquals this o)))
+  (seq [this] (seq lst))
+  (valAt [this k] (indirect idx lst k))
+  (valAt [this k not-found] (indirect-nf idx lst k not-found))
 
-(def EMPTY_MAP (vec-map))
+  IHashEq
+  (hasheq [this] (+ magic (.hasheq ^IHashEq lst)))
+  
+  IObj
+  (withMeta [this meta] (VecMap. lst (.withMeta ^IObj idx meta)))
+  (meta [this] (.meta ^IObj idx))
+
+  MapEquivalence
+
+  Map
+  (clear [this] (throw (UnsupportedOperationException.)))
+  (containsValue [this v] (some #(= % v) (map val lst)))
+  (equals [this o] (.equiv this o))
+  (get [this k] (indirect idx lst k))
+  (hashCode [this] (+ magic (hash lst)))
+  (isEmpty [this] (empty? lst))
+  (keySet [this] (set (map key lst)))
+  (size [this] (count lst))
+  (values [this] (map val lst))
+  (put [this k v] (throw (UnsupportedOperationException.)))
+  (putAll [this m] (throw (UnsupportedOperationException.)))
+  (remove [this k] (throw (UnsupportedOperationException.))))
+
+(def EMPTY_MAP (VecMap. [] {}))
 
 (defn vreverse
   "Reverses a vector into a vector. Lists are reversed as usual."
@@ -102,29 +109,59 @@
                       (fn [[seen? acc] [k v]]
                         (if (seen? k) [seen? acc] [(conj seen? k) (conj acc (MapEntry/create k v))]))
                       [#{} []] (reverse (partition 2 keyvals)))))]
-     (vec-map
+     (VecMap.
        kv-vec
        (apply hash-map (interleave (map first kv-vec) (range)))))))
 
-(defn- vec-set
-  "Creates an object that implements the required set interfaces."
-  ([] (vec-set EMPTY_MAP))
-  ([s]
-    (proxy [APersistentSet IObj Debug] [s]
-      (dp [] (.dp s))
-      (disjoin [key] (vec-set (dissoc s key)))
-      (cons [o] (vec-set (assoc s o o)))
-      (empty [] (vec-set))
-      (withMeta [meta] (vec-set (with-meta s meta)))
-      (meta [] (meta s)))))
+(deftype VecSet [^VecMap om]
+  IFn
+  (invoke [this k] (.invoke om k))
+  (invoke [this k not-found] (.invoke om k not-found))
+  (invoke [this a b & rest] (throw (UnsupportedOperationException.)))
+  (applyTo [this s] (case (count s)
+                      1 (.invoke om (first s))
+                      2 (.invoke om (first s) (second s))
+                      (throw (clojure.lang.ArityException. (count s) "Map.invoke"))))
 
-(def EMPTY_SET (vec-set))
+  IPersistentSet
+  (disjoin [this k] (VecSet. (.without om k)))
+  (contains [this k] (.containsKey om k))
+  (get [this k] (.get om k))
+  (count [this] (.count om))
+  (cons [this o] (VecSet. (.assoc om o o)))
+  (empty [this] (VecSet. EMPTY_MAP))
+  (equiv [this o] (APersistentSet/setEquals this o))
+  (seq [this] (keys om))
+
+  Set
+  (add [this e] (throw (UnsupportedOperationException.)))
+  (addAll [this c] (throw (UnsupportedOperationException.)))
+  (clear [this] (throw (UnsupportedOperationException.)))
+  (containsAll [this c] (every? om c))
+  (equals [this o] (APersistentSet/setEquals this o))
+  (hashCode [this] (+ set-magic (.hashCode om)))
+  (isEmpty [this] (.isEmpty om))
+  (iterator [this] (.iterator ^Collection (keys om)))
+  (remove [this o] (throw (UnsupportedOperationException.)))
+  (removeAll [this c] (throw (UnsupportedOperationException.)))
+  (retainAll [this c] (throw (UnsupportedOperationException.)))
+  (size [this] (.count om))
+  (toArray [this] (clojure.lang.RT/seqToArray (keys om)))
+
+  IHashEq
+  (hasheq [this] (+ set-magic (.hasheq om)))
+
+  IObj
+  (withMeta [this meta] (VecSet. (.withMeta om meta)))
+  (meta [this] (.meta om)))
+
+(def EMPTY_SET (VecSet. EMPTY_MAP))
 
 (defn ordered-set
   "Creates a set object that remembers the insertion order, similarly to a java.util.LinkedHashSet"
   ([] EMPTY_SET)
   ([& s]
-   (vec-set (apply ordered-map (mapcat #(repeat 2 %) s)))))
+   (VecSet. (apply ordered-map (mapcat #(repeat 2 %) s)))))
 
 (defn oset
   "Convenience function to create an ordered set from a seq"
