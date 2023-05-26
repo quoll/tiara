@@ -111,15 +111,15 @@ The numbers presented here are on a 14-inch MacBook Pro, 2021, with an M1 chip. 
 
 ### Inserting Data
 ```clojure
-(bench (into (flatland.ordered.map/ordered-map) (map (fn [n] [n n]) data)))
 (bench (into (linked.core/map) (map (fn [n] [n n]) data)))
+(bench (into (flatland.ordered.map/ordered-map) (map (fn [n] [n n]) data)))
 (bench (into (tiara.data/ordered-map) (map (fn [n] [n n]) data)))
 ```
 
 |Library|Time (ms)|Std Dev (ms)|
 |-------|---------|------------|
-|Ordered|578.3|81.3|
 |Linked|1384.5|72.6|
+|Ordered|578.3|81.3|
 |Tiara|616.0|64.5ms|
 
 Ordered was the fastest here, by a slim margin over Tiara. Linked was the slowest by a long way, which reflects the multiple updates required for each insertion.
@@ -129,9 +129,9 @@ Ordered was the fastest here, by a slim margin over Tiara. Linked was the slowes
 ### Access
 Using the same data, the maps were saved:
 ```clojure
-(def linked (into (l/map) (map (fn [n] [n n]) data)))
-(def ordered (into (om/ordered-map) (map (fn [n] [n n]) data)))
-(def tiara (into (d/ordered-map) (map (fn [n] [n n]) data)))
+(def linked (into (linked.core/map) (map (fn [n] [n n]) data)))
+(def ordered (into (flatland.ordered.map/ordered-map) (map (fn [n] [n n]) data)))
+(def tiara (into (tiara.data/ordered-map) (map (fn [n] [n n]) data)))
 ```
 Using the randomized data as keys, each value was looked up and added to an accumulator. This operation therefore accessed every member of the map:
 ```clojure
@@ -142,8 +142,8 @@ Using the randomized data as keys, each value was looked up and added to an accu
 
 |Library|Time (ms)|Std Dev (ms)|
 |-------|---------|------------|
-|Linked|452.1|53.4|
-|Ordered|371.2|83.8|
+|Linked|371.2|83.8|
+|Ordered|452.1|53.4|
 |Tiara|311.2|27.4|
 
 Linked and Tiara are close, though Tiara was consistently faster. I suspect that this is because there is overhead in accessing fields in the `Node` records that are defined in that namespace when compared to accessing the `value` field of the `MapEntry` that is defined in Java code.
