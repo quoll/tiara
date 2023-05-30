@@ -91,27 +91,17 @@
 
 (def EMPTY_MAP (VecMap. [] {}))
 
-(defn vreverse
-  "Reverses a vector into a vector. Lists are reversed as usual."
-  [v]
-  (if (vector? v)
-    (mapv #(nth v %) (range (dec (count v)) -1 -1))
-    (reverse v)))
-
-
 (defn ordered-map
   "Creates a map object that remembers the insertion order, similarly to a java.util.LinkedHashMap"
   ([] EMPTY_MAP)
   ([& keyvals]
-   (let [kv-vec (vreverse
-                  (second
-                    (reduce
-                      (fn [[seen? acc] [k v]]
-                        (if (seen? k) [seen? acc] [(conj seen? k) (conj acc (MapEntry/create k v))]))
-                      [#{} []] (reverse (partition 2 keyvals)))))]
+   (let [m (apply hash-map keyvals)
+         ks (if (= (* 2 (count m)) (count keyvals))
+              (into [] (take-nth 2) keyvals)
+              (into () (distinct) (into () (take-nth 2) keyvals)))]
      (VecMap.
-       kv-vec
-       (apply hash-map (interleave (map first kv-vec) (range)))))))
+       (mapv #(find m %) ks)
+       (zipmap ks (range))))))
 
 (deftype VecSet [^VecMap om]
   IFn
