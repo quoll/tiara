@@ -119,6 +119,12 @@
        kv-vec
        (apply hash-map (interleave (map first kv-vec) (range)))))))
 
+(definline transiable-subvec
+  "Get a subvec into a vector that can be made transient, skipping some of the steps
+   of instance checking that the usual API imposes."
+  [v start end]
+  `(clojure.lang.LazilyPersistentVector/createOwning (clojure.lang.RT/toArray (subvec ~v ~start ~end))))
+
 (deftype TransientVecMap [^ITransientVector lst ^ITransientMap idx]
   ITransientMap
   (assoc [this k v]
@@ -138,7 +144,7 @@
   (without [this k]
     (if-let [split (get idx k)]
       (let [plst (persistent! lst)]
-        (TransientVecMap. (reduce conj! (transient (subvec plst 0 split)) (subvec plst (inc split)))
+        (TransientVecMap. (reduce conj! (transient (transiable-subvec plst 0 split)) (subvec plst (inc split)))
                           (reduce (fn [index n]
                                     (let [k (key (nth plst n))]
                                       (assoc! index k (dec (get index k)))))
@@ -154,7 +160,16 @@
       not-found))
   (count [this] (count lst))
   (persistent [this] (VecMap. (.persistent lst) (.persistent idx)))
-  (conj [this [k v]] (.assoc this k v)))
+  (conj [this [k v]] (.assoc this k v))
+
+  IFn
+  (invoke [this k] (.valAt this k))
+  (invoke [this k not-found] (.valAt this k not-found))
+  (invoke [this a b & rest] (throw (UnsupportedOperationException.)))
+  (applyTo [this s] (case (count s)
+                      1 (.valAt this (first s))
+                      2 (.valAt this (first s) (second s))
+                      (throw (clojure.lang.ArityException. (count s) "Map.invoke")))))
 
 (defn transient-ordered-map
   [^IEditableCollection lst ^IEditableCollection idx]
@@ -170,7 +185,7 @@
   (applyTo [this s] (case (count s)
                       1 (.invoke om (first s))
                       2 (.invoke om (first s) (second s))
-                      (throw (clojure.lang.ArityException. (count s) "Map.invoke"))))
+                      (throw (clojure.lang.ArityException. (count s) "Set.invoke"))))
 
   IPersistentSet
   (disjoin [this k] (VecSet. (.without om k)))
@@ -223,7 +238,7 @@
 (deftype TransientVecSet [^TransientVecMap om]
   ITransientSet
   (count [this] (.count om))
-  (get [this k] (.get om))
+  (get [this k] (.get om k))
   (disjoin [this k]
     (let [nom (.without om k)]
       (if (identical? nom om)
@@ -235,9 +250,18 @@
         this
         (TransientVecSet. nom))))
   (contains [this k]
-    (boolean (get (:lst om) k)))  ;; ensures that nil members are reported correctly
+    (boolean (.get (:lst om) k)))  ;; ensures that nil members are reported correctly
   (persistent [this]
-    (VecSet. (.persistent om))))
+    (VecSet. (.persistent om)))
+
+  IFn
+  (invoke [this k] (.get this k))
+  (invoke [this k not-found] (.get this k not-found))
+  (invoke [this a b & rest] (throw (UnsupportedOperationException.)))
+  (applyTo [this s] (case (count s)
+                      1 (.get this (first s))
+                      2 (.get this (first s) (second s))
+                      (throw (clojure.lang.ArityException. (count s) "Set.invoke")))))
 
 (defn transient-ordered-set
   [^IEditableCollection os]
