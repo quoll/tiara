@@ -1,8 +1,9 @@
-(ns ^{:doc "Divergent data structures"
-      :author "Paula Gearon"}
-  tiara.data
+(ns tiara.data
+  "Divergent data structures"
+  {:author "Paula Gearon"}
   (:import [clojure.lang IFn APersistentMap APersistentSet MapEntry ISeq
-            IPersistentMap IPersistentSet IHashEq IObj MapEquivalence]
+            IPersistentMap IPersistentSet IHashEq IObj MapEquivalence
+            IEditableCollection ITransientVector ITransientMap ITransientSet]
            [java.util Map Set Collection]))
 
 (def ^:const magic 7)
@@ -21,6 +22,8 @@
   `(if-let [n# (~index ~k)]
      (val (nth ~entry-vector n#))
      ~not-found))
+
+(declare transient-ordered-map)
 
 (deftype VecMap [lst idx]
   IFn
@@ -65,6 +68,9 @@
   (seq [this] (seq lst))
   (valAt [this k] (indirect idx lst k))
   (valAt [this k not-found] (indirect-nf idx lst k not-found))
+
+  IEditableCollection
+  (asTransient [this] (transient-ordered-map lst idx))
 
   IHashEq
   (hasheq [this] (+ magic (.hasheq ^IHashEq lst)))
@@ -113,6 +119,49 @@
        kv-vec
        (apply hash-map (interleave (map first kv-vec) (range)))))))
 
+(deftype TransientVecMap [^ITransientVector lst ^ITransientMap idx]
+  ITransientMap
+  (assoc [this k v]
+    (if-let [n (get idx k)]
+      (if (= (val (nth lst n)) v)
+        this
+        (let [nlst (.assoc lst n (MapEntry/create k v))]
+          (if (identical? nlst lst)
+            this
+            (TransientVecMap. nlst idx))))
+      (let [len (count lst)
+            nlst (.conj lst (MapEntry/create k v))
+            nidx (.assoc idx k len)]
+        (if (and (identical? nlst lst) (identical? nidx idx))
+          this
+          (TransientVecMap. nlst nidx)))))
+  (without [this k]
+    (if-let [split (get idx k)]
+      (let [plst (persistent! lst)]
+        (TransientVecMap. (reduce conj! (transient (subvec plst 0 split)) (subvec plst (inc split)))
+                          (reduce (fn [index n]
+                                    (let [k (key (nth plst n))]
+                                      (assoc! index k (dec (get index k)))))
+                                  (dissoc! idx k)
+                                  (range (inc split) (count plst)))))
+      this))
+  (valAt [this key]
+    (when-let [n (idx key)]
+      (val (nth lst n))))
+  (valAt [this key not-found]
+    (if-let [n (idx key)]
+      (val (nth lst n))
+      not-found))
+  (count [this] (count lst))
+  (persistent [this] (VecMap. (.persistent lst) (.persistent idx)))
+  (conj [this [k v]] (.assoc this k v)))
+
+(defn transient-ordered-map
+  [^IEditableCollection lst ^IEditableCollection idx]
+  (TransientVecMap. (.asTransient lst) (.asTransient idx)))
+
+(declare transient-ordered-set)
+
 (deftype VecSet [^VecMap om]
   IFn
   (invoke [this k] (.invoke om k))
@@ -153,7 +202,10 @@
 
   IObj
   (withMeta [this meta] (VecSet. (.withMeta om meta)))
-  (meta [this] (.meta om)))
+  (meta [this] (.meta om))
+
+  IEditableCollection
+  (asTransient [this] (transient-ordered-set om)))
 
 (def EMPTY_SET (VecSet. EMPTY_MAP))
 
@@ -167,3 +219,26 @@
   "Convenience function to create an ordered set from a seq"
   [s]
   (apply ordered-set s))
+
+(deftype TransientVecSet [^TransientVecMap om]
+  ITransientSet
+  (count [this] (.count om))
+  (get [this k] (.get om))
+  (disjoin [this k]
+    (let [nom (.without om k)]
+      (if (identical? nom om)
+        this
+        (TransientVecSet. nom))))
+  (conj [this k]
+    (let [nom (.assoc om k k)]
+      (if (identical? nom om)
+        this
+        (TransientVecSet. nom))))
+  (contains [this k]
+    (boolean (get (:lst om) k)))  ;; ensures that nil members are reported correctly
+  (persistent [this]
+    (VecSet. (.persistent om))))
+
+(defn transient-ordered-set
+  [^IEditableCollection os]
+  (TransientVecSet. (.asTransient os)))
