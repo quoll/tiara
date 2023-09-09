@@ -1,11 +1,6 @@
 # Tiara
 A small data structure library.
 
-## Transient Branch
-This branch introduced transient versions of ordered maps and sets. However, these turned out to be 3 times slower than the standard version.
-
-This branch is defunct.
-
 ### deps.edn
 
 Add the following dependency to the :deps map in deps.edn:
