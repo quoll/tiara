@@ -136,8 +136,8 @@
             this
             (TransientVecMap. nlst idx))))
       (let [len (count lst)
-            nlst (.conj lst (MapEntry/create k v))
-            nidx (.assoc idx k len)]
+            nlst (.conj ^ITransientVector lst (MapEntry/create k v))
+            nidx (.assoc ^ITransientMap idx k (Long. len))]
         (if (and (identical? nlst lst) (identical? nidx idx))
           this
           (TransientVecMap. nlst nidx)))))
@@ -237,30 +237,30 @@
 
 (deftype TransientVecSet [^TransientVecMap om]
   ITransientSet
-  (count [this] (.count om))
-  (get [this k] (.get om k))
+  (count [this] (.count ^ITransientMap om))
+  (get [this k] (.valAt ^ITransientMap om k))
   (disjoin [this k]
-    (let [nom (.without om k)]
+    (let [nom (.without ^ITransientMap om k)]
       (if (identical? nom om)
         this
         (TransientVecSet. nom))))
   (conj [this k]
-    (let [nom (.assoc om k k)]
+    (let [nom (.assoc ^ITransientMap om k k)]
       (if (identical? nom om)
         this
         (TransientVecSet. nom))))
   (contains [this k]
-    (boolean (.get (:lst om) k)))  ;; ensures that nil members are reported correctly
+    (boolean (.valAt ^ITransientVector (:lst om) k)))  ;; ensures that nil members are reported correctly
   (persistent [this]
-    (VecSet. (.persistent om)))
+    (VecSet. (.persistent ^TransientVecMap om)))
 
   IFn
-  (invoke [this k] (.get this k))
-  (invoke [this k not-found] (.get this k not-found))
+  (invoke [this k] (.get ^ITransientSet this k))
+  (invoke [this k not-found] (.valAt ^ITransientMap om k not-found))
   (invoke [this a b & rest] (throw (UnsupportedOperationException.)))
   (applyTo [this s] (case (count s)
-                      1 (.get this (first s))
-                      2 (.get this (first s) (second s))
+                      1 (.get ^ITransientSet this (first s))
+                      2 (.valAt ^ITransientMap om (first s) (second s))
                       (throw (clojure.lang.ArityException. (count s) "Set.invoke")))))
 
 (defn transient-ordered-set
