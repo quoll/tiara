@@ -6,7 +6,7 @@ A small data structure library.
 Add the following dependency to the :deps map in deps.edn:
 
 ```clojure
-org.clojars.quoll/tiara {:mvn/version "0.3.0"}
+org.clojars.quoll/tiara {:mvn/version "0.3.1"}
 ```
 
 ## Usage
