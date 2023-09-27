@@ -89,6 +89,10 @@
           mp (reduce conj EMPTY_MAP kvs)]
       (is (= (vals mp) (map second kvs))))))
 
+(deftest test-strings
+  (testing "If the str function works on maps"
+    (is (= "{:a \"one\", :b \"two\"}" (str (ordered-map :a "one" :b "two"))))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Set testing
@@ -153,5 +157,9 @@
       (doseq [n (shuffle (range 20))]
         (is (= (make-key n) (s (make-key n))))
         (is (nil? (s (make-key (+ 20 n)))))))))
+
+(deftest test-set-strings
+  (testing "If the str function works on sets"
+    (is (= "#{:a :b}" (str (ordered-set :a :b))))))
 
 ;; TIARA Is A Recursive Acronym
