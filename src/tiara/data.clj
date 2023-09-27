@@ -93,7 +93,10 @@
   (values [this] (map val lst))
   (put [this k v] (throw (UnsupportedOperationException.)))
   (putAll [this m] (throw (UnsupportedOperationException.)))
-  (remove [this k] (throw (UnsupportedOperationException.))))
+  (remove [this k] (throw (UnsupportedOperationException.)))
+
+  Object
+  (toString [this] (clojure.lang.RT/printString this)))
 
 (def EMPTY_MAP (VecMap. [] {}))
 
@@ -220,7 +223,10 @@
   (meta [this] (.meta om))
 
   IEditableCollection
-  (asTransient [this] (transient-ordered-set om)))
+  (asTransient [this] (transient-ordered-set om))
+
+  Object
+  (toString [this] (clojure.lang.RT/printString this)))
 
 (def EMPTY_SET (VecSet. EMPTY_MAP))
 
