@@ -3,6 +3,7 @@
   (:require [clojure.tools.build.api :as b] ; for b/git-count-revs
             [org.corfield.build :as bb]))
 
+(def pom "build-rsc/pom.xml")
 (def lib 'org.clojars.quoll/tiara)
 (def version "0.3.1")
 
@@ -12,13 +13,11 @@
 
 ;; clojure -T:build ci
 (defn ci "Run the CI pipeline of tests (and build the JAR)." [opts]
-  (if-not (.exists (java.io.File. "pom.xml"))
-    (throw (ex-info "Must have a pom.xml with a license section" {:missing "./pom.xml"}))
-    (-> opts
-        (assoc :lib lib :version version)
-        (bb/run-tests)
-        (bb/clean)
-        (bb/jar))))
+  (-> opts
+      (assoc :lib lib :version version :src-pom pom)
+      (bb/run-tests)
+      (bb/clean)
+      (bb/jar)))
 
 ;; clojure -T:build install
 (defn install "Install the JAR locally." [opts]
