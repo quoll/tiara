@@ -12,11 +12,13 @@
 
 ;; clojure -T:build ci
 (defn ci "Run the CI pipeline of tests (and build the JAR)." [opts]
-  (-> opts
-      (assoc :lib lib :version version)
-      (bb/run-tests)
-      (bb/clean)
-      (bb/jar)))
+  (if-not (.exists (java.io.File. "pom.xml"))
+    (throw (ex-info "Must have a pom.xml with a license section") {:missing "./pom.xml"})
+    (-> opts
+        (assoc :lib lib :version version)
+        (bb/run-tests)
+        (bb/clean)
+        (bb/jar))))
 
 ;; clojure -T:build install
 (defn install "Install the JAR locally." [opts]
