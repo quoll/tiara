@@ -93,6 +93,14 @@
   (testing "If the str function works on maps"
     (is (= "{:a \"one\", :b \"two\"}" (str (ordered-map :a "one" :b "two"))))))
 
+(deftest test-meta
+  (testing "If metadata survives modifications to the map"
+    (let [m ^{:doc "data"} (ordered-map :a "one")]
+      (is (= "data" (:doc (meta (assoc m :b "two")))))
+      (is (= "data" (:doc (meta (dissoc m :a)))))
+      (is (= "data" (:doc (meta (dissoc m :b)))))
+      (is (= "data" (:doc (meta (empty m))))))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Set testing
