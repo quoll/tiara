@@ -3,7 +3,7 @@
             [tiara.data-test :refer [make-map make-map-assoc make-kv-range make-key]]
             [tiara.data :refer [ordered-map EMPTY_MAP ordered-set oset EMPTY_SET]]))
 
-(set! *warn-on-reflection* true)
+#?(:clj (set! *warn-on-reflection* true))
 
 (deftest test-round-trip
   (testing "equivalence of maps that round-trip through transience"
@@ -239,5 +239,7 @@
       (is (= (concat (remove (set rkeys) k1100) ikeys) (seq to1)))
       (is (= 825 (count to1)))
       (is (= 825 (count (seq to1)))))))
+
+#?(:cljs (cljs.test/run-tests))
 
 ;; TIARA Is A Recursive Acronym

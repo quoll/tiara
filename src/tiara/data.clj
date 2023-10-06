@@ -174,7 +174,7 @@
                       2 (.valAt this (first s) (second s))
                       (throw (clojure.lang.ArityException. (count s) "Map.invoke")))))
 
-(defn transient-ordered-map
+(defn- transient-ordered-map
   [^IEditableCollection lst ^IEditableCollection idx]
   (TransientVecMap. (.asTransient lst) (.asTransient idx)))
 
