@@ -1,12 +1,12 @@
 # Tiara
-A small data structure library.
+A small data structure library for Clojure and ClojureScript.
 
 ### deps.edn
 
 Add the following dependency to the :deps map in deps.edn:
 
 ```clojure
-org.clojars.quoll/tiara {:mvn/version "0.3.1"}
+org.clojars.quoll/tiara {:mvn/version "0.3.2"}
 ```
 
 ## Usage
