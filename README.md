@@ -1,12 +1,12 @@
 # Tiara
-A small data structure library.
+A small data structure library for Clojure and ClojureScript.
 
 ### deps.edn
 
 Add the following dependency to the :deps map in deps.edn:
 
 ```clojure
-org.clojars.quoll/tiara {:mvn/version "0.2.1"}
+org.clojars.quoll/tiara {:mvn/version "0.3.2"}
 ```
 
 ## Usage
@@ -120,9 +120,9 @@ The numbers presented here are on a 14-inch MacBook Pro, 2021, with an M1 chip. 
 |-------|---------|------------|
 |Linked|1384.5|72.6|
 |Ordered|578.3|81.3|
-|Tiara|616.0|64.5ms|
+|Tiara|422.7|40.0|
 
-Ordered was the fastest here, by a slim margin over Tiara. Linked was the slowest by a long way, which reflects the multiple updates required for each insertion.
+Ordered used to be the fastest here, by a slim margin over Tiara. However, Tiara did not include Transient versions of the data Structures. Since these were introduced, the timing has improved by about 30%. Linked was the slowest by a long way, which reflects the multiple updates required for each insertion.
 
 **However**, after saving each of these maps (shown in the next test), attempting to run this benchmark on Ordered led to Heap Exhaustion! This problem did not affect either Linked or Tiara. Restarting the repl with a larger heap allowed this test to proceed.
 

@@ -2,7 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [tiara.data :refer [ordered-map EMPTY_MAP ordered-set oset EMPTY_SET]]))
 
-(set! *warn-on-reflection* true)
+#?(:clj (set! *warn-on-reflection* true))
 
 (defn make-key [n] (keyword (str "k" n)))
 
@@ -89,6 +89,18 @@
           mp (reduce conj EMPTY_MAP kvs)]
       (is (= (vals mp) (map second kvs))))))
 
+(deftest test-strings
+  (testing "If the str function works on maps"
+    (is (= "{:a \"one\", :b \"two\"}" (str (ordered-map :a "one" :b "two"))))))
+
+(deftest test-meta
+  (testing "If metadata survives modifications to the map"
+    (let [m (with-meta (ordered-map :a "one") {:doc "data"})]
+      (is (= "data" (:doc (meta (assoc m :b "two")))))
+      (is (= "data" (:doc (meta (dissoc m :a)))))
+      (is (= "data" (:doc (meta (dissoc m :b)))))
+      (is (= "data" (:doc (meta (empty m))))))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Set testing
@@ -123,7 +135,7 @@
 (defn make-set-conj [st]
   (reduce conj (st) (shuffle (krange 20))))
 
-(deftest test-conj
+(deftest test-set-conj
   (testing "equivalence of sets constructed using conj"
     (is (= #{:a :b} (conj (ordered-set :a) :b)))
     (is (= (make-set-conj hash-set)
@@ -153,5 +165,11 @@
       (doseq [n (shuffle (range 20))]
         (is (= (make-key n) (s (make-key n))))
         (is (nil? (s (make-key (+ 20 n)))))))))
+
+(deftest test-set-strings
+  (testing "If the str function works on sets"
+    (is (= "#{:a :b}" (str (ordered-set :a :b))))))
+
+#?(:cljs (cljs.test/run-tests))
 
 ;; TIARA Is A Recursive Acronym
