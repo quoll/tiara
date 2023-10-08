@@ -57,7 +57,7 @@ I am often encountering cases where I need to append data to a structure that wi
 
 While it would be possible to use Java's [LinkedHashMap](https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/util/LinkedHashMap.html) and [LinkedHashSets](https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/util/LinkedHashSet.html), these are not immutable structures, and hence are not ideal for functional programming. I suspected that an immutable equivalent may have existed, but the required functionality did not appear difficult and I thought it would be an interesting learning experience to write my own version.
 
-In fact, there were already existing libraries (found by [Tom Delziel](https://github.com/tomdl89)):
+In fact, there were already existing libraries (found by [Tom Dalziel](https://github.com/tomdl89)):
 - [Ordered](https://github.com/clj-commons/ordered)
 - [Linked](https://github.com/frankiesardo/linked)
 
@@ -89,11 +89,11 @@ The seq of an Ordered map is based on filtering the nils out of the backing vect
 ### Linked
 This is a significantly different data structure. Each entry is given a node that contains the value, along with references to `left` and `right`. These are the key values to find nodes before and after them, which is an indirection for creating a doubly-linked list. (Indirection is needed for doubly-linked lists in functional data structures, since second updates to nodes will not update any references to the node). The linked list is circular, to allow iteration both forward and back, starting from the stored head of the list.
 
-Storage requires the default `MapEntry` in the backing hashmap, along with a `Node` object that will go to the tail position of the list. This node will set the `right` pointer to the head, and the `left` reference to the previous `tail`. The head must set it's `left` to point to the new tail, and the previous tail must update its `right` reference to point to this new tail. Due to indirection, this means looking up the existing `head` and `tail` and then setting their `left` and `right` references, respectfully. This is a lot of updates to the backing map, and incurs a significant cost.
+Storage requires the default `MapEntry` in the backing hashmap, along with a `Node` object that will go to the tail position of the list. This node will set the `right` pointer to the head, and the `left` reference to the previous `tail`. The head must set its `left` to point to the new tail, and the previous tail must update its `right` reference to point to this new tail. Due to indirection, this means looking up the existing `head` and `tail` and then setting their `left` and `right` references, respectively. This is a lot of updates to the backing map, and incurs a significant cost.
 
 Looking up a key retrieves the node with the value, which can be returned immediately. If the entry has been requested (with `find`) then a new `MapEntry` must be constructed.
 
-Removal is similar to insertion, in that the node can be found by a lookup in the tree, and the keys for the nodes to it's `left` and `right` can be found. These nodes can be set to refer to each other, thereby removing the target node from the linked list. Finally, the node can be removed from the backing map.
+Removal is similar to insertion, in that the node can be found by a lookup in the tree, and the keys for the nodes to its `left` and `right` can be found. These nodes can be set to refer to each other, thereby removing the target node from the linked list. Finally, the node can be removed from the backing map.
 
 The ordered seq can be built out of the nodes using their linked list. However, due to each node holding only the key of the next node in the list, this means that every step in the iteration requires a map lookup.
 
