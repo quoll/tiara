@@ -106,11 +106,11 @@
   ([& keyvals]
    (let [m (apply hash-map keyvals)
          ks (if (= (* 2 (count m)) (count keyvals))
-              (into [] (take-nth 2) keyvals)
-              (into () (distinct) (into () (take-nth 2) keyvals)))]
+              (take-nth 2 keyvals) 
+              (into [] (comp (take-nth 2) (distinct)) keyvals))]
      (VecMap.
-       (mapv #(find m %) ks)
-       (zipmap ks (range))))))
+      (mapv #(find m %) ks)
+      (zipmap ks (range))))))
 
 (definline transiable-subvec
   "Get a subvec into a vector that can be made transient, skipping some of the steps

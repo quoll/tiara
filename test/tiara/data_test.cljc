@@ -101,6 +101,12 @@
       (is (= "data" (:doc (meta (dissoc m :b)))))
       (is (= "data" (:doc (meta (empty m))))))))
 
+(deftest test-construct
+  (testing "If multiple uses of a key show up in the place of the first key"
+    (let [m (ordered-map :a 1 :b 2 :c 3 :a 4 :d 5 :e 6 :f 7 :h 8 :i 9 :j 10)]
+      (is (= {:a 4 :b 2 :c 3 :d 5 :e 6 :f 7 :h 8 :i 9 :j 10} m))
+      (is (= [[:a 4] [:b 2] [:c 3] [:d 5] [:e 6]
+              [:f 7] [:h 8] [:i 9] [:j 10]] (seq m))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Set testing
