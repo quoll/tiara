@@ -5,7 +5,7 @@
 
 (def pom "build-rsc/pom.xml")
 (def lib 'org.clojars.quoll/tiara)
-(def version "0.3.3")
+(def version "0.3.4")
 
 ;; clojure -X:build
 (defn test "Run the tests." [opts]

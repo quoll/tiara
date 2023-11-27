@@ -35,6 +35,20 @@
     (is (= (seq (apply array-map (make-kv-range 20)))
            (seq (apply ordered-map (make-kv-range 20)))))))
 
+(defn- drain-iterable
+  "Similar to iterator-seq, without chunking"
+  [i]
+  (let [^java.util.Iterator it (.iterator ^Iterable i)]
+    (loop [v []]
+      (if (.hasNext it)
+        (recur (conj v (.next it)))
+        v))))
+
+(deftest test-iterable
+  (testing "Testing the iterable interface"
+    (is (= [] (drain-iterable (ordered-map))))
+    (is (= [[:a 1] [:b 2]] (drain-iterable (ordered-map :a 1 :b 2))))))
+
 (deftest test-assoc
   (testing "equivalence of maps constructed using assoc"
     (is (= {:a 1 :b 2} (assoc (ordered-map :a 1) :b 2)))
