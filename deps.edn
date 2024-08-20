@@ -1,5 +1,5 @@
 {:paths ["src" "resources"]
- :deps {org.clojure/clojure {:mvn/version "1.11.1"} }
+ :deps {org.clojure/clojure {:mvn/version "1.11.4"} }
  :aliases
  {:test
   {:extra-paths ["test"]
@@ -14,7 +14,7 @@
                "--repl-env" "node"
                "-i" "test/tiara/data_test.cljc"
                "-i" "test/tiara/transient_test.cljc"]  ;; execute with clj -M:test-cljs
-   :extra-deps {org.clojure/clojurescript {:mvn/version "1.11.60"}} }
+   :extra-deps {org.clojure/clojurescript {:mvn/version "1.11.132"}} }
   :build {:deps {io.github.seancorfield/build-clj
                  {:git/tag "v0.8.2" :git/sha "0ffdb4c"}}
           :ns-default build}
