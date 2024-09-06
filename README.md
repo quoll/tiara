@@ -6,12 +6,12 @@ A small data structure library for Clojure and ClojureScript.
 Add the following dependency to the :deps map in deps.edn:
 
 ```clojure
-org.clojars.quoll/tiara {:mvn/version "0.3.5"}
+org.clojars.quoll/tiara {:mvn/version "0.3.6"}
 ```
 
 ### Leiningen/Boot
 ```clojure
-[org.clojars.quoll/tiara "0.3.5"]
+[org.clojars.quoll/tiara "0.3.6"]
 ```
 
 ## Usage
