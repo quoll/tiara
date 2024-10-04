@@ -192,7 +192,9 @@ Tiara has an advantage in this test, since it already has the seq ready to retur
 ### Result
 When not removing items, Tiara seems to have slightly better performance than Ordered, and quite a lot better than Linked. While slower (17%) in random access, this is not a common use case for this kind of data structure.
 
-Both Linked and Tiara seem to have better memory consumption profiles. Ordered used to have heap exhaustion issues, but this appears to have improved.
+Despite no changes in code, previous tests showed Tiara to be better than Ordered for random access. The difference here is the testing platform. While the newer CPU is likely to benefit all platforms equally, the newer JDK shows much better memory management performance. This allows Ordered to run without heap exhaustion (and used to require a JDK flag for an expanded heap before it could run), and has significantly improved the allocation/deallocation of the `MapEntry` objects that it uses.
+
+Both Linked and Tiara seem to have better memory consumption profiles than Ordered, though JDK 21 appears to remove this as an issue.
 
 For access patterns that do not require significant removals, then Tiara should provide some benefits.
 
