@@ -125,7 +125,7 @@ The numbers presented here are on JDK 21, running on a 14-inch MacBook Pro, Nov 
 |-------|---------|------------|
 |Linked|839.4|36.3|
 |Ordered|365.4|106.3|
-|Tiara|341.0|30.6|
+|Tiara|330.3|33.8|
 
 Ordered used to be the fastest here, by a slim margin over Tiara. However, Tiara did not include Transient versions of the data Structures. Since these were introduced, the timing has improved by about 30%. Linked was the slowest by a long way, which reflects the multiple updates required for each insertion. Note that Ordered has a standard deviation of 29%.
 
@@ -147,13 +147,11 @@ Using the randomized data as keys, each value was looked up and added to an accu
 
 |Library|Time (ms)|Std Dev (ms)|
 |-------|---------|------------|
-|Linked|127.2|7.9|
-|Ordered|121.8|8.0|
-|Tiara|142.5|10.1|
+|Linked|119.3|5.4|
+|Ordered|113.6|4.0|
+|Tiara|118.5|5.4|
 
-All three are relatively close with Tiara being 17% slower than Ordered. This has changed since 2023, when Tiara used to be slightly faster. Ordered used to be quite a bit slower than the other 2, but has since become the fastest.
-
-Strangely, over multiple runs both Linked and Ordered kept returning better values (starting at only 6% faster than Tiara), but as they kept returning slightly faster values, Tiara ran with an almost identical average every time. This goes against my intuition since Linked and Ordered also have smaller standard deviations, so I wouldn't have expected to see them move their average down. I anticipate that these differences came from a different distribution of the random data each time. (The same data was run against all 3 libraries each time).
+All three are relatively close with Tiara being 4% slower than Ordered. This has changed since 2023, when Tiara used to be slightly faster. Ordered used to be quite a bit slower than the other 2, but has since become the fastest.
 
 ### Seq Processing
 The reason for this data structure is to be able to return data in order, so the next test was to look at that. Accessing the vals means pulling data out of the ordering, which may be different to getting the full seq, so I looked at both. I started by looking at the vals:
@@ -190,7 +188,7 @@ Next, I looked at seqs, iterating over each entry, but ignoring the values:
 Tiara has an advantage in this test, since it already has the seq ready to return, while Ordered needed to create `MapEntry` objects for each element. Ordered still does well though.
 
 ### Result
-When not removing items, Tiara seems to have slightly better performance than Ordered, and quite a lot better than Linked. While slower (17%) in random access, this is not a common use case for this kind of data structure.
+When not removing items, Tiara seems to have slightly better performance than Ordered, and quite a lot better than Linked. While slightly slower (4%) in random access, this is not a common use case for this kind of data structure.
 
 Despite no changes in code, previous tests showed Tiara to be better than Ordered for random access. The difference here is the testing platform. While the newer CPU is likely to benefit all platforms equally, the newer JDK shows much better memory management performance. This allows Ordered to run without heap exhaustion (and used to require a JDK flag for an expanded heap before it could run), and has significantly improved the allocation/deallocation of the `MapEntry` objects that it uses.
 
