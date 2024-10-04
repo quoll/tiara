@@ -18,4 +18,10 @@
   :build {:deps {io.github.seancorfield/build-clj
                  {:git/tag "v0.8.2" :git/sha "0ffdb4c"}}
           :ns-default build}
-  :neil {:project {:name quoll/tiara}}}}
+  :bench {:extra-deps {criterium/criterium {:mvn/version "0.4.6"}
+                       org.flatland/ordered {:mvn/version "1.15.12"}
+                       frankiesardo/linked {:mvn/version "1.3.0"}} 
+          :extra-paths ["benchmarks"]
+          ;; :main-opts ["-m" "benchmarks.core"]
+          :exec-fn tiara.compare/benchmarks!}}}
+
