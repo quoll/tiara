@@ -6,12 +6,12 @@ A small data structure library of ordered maps and sets in Clojure and ClojureSc
 Add the following dependency to the :deps map in deps.edn:
 
 ```clojure
-org.clojars.quoll/tiara {:mvn/version "0.3.6"}
+org.clojars.quoll/tiara {:mvn/version "0.3.7"}
 ```
 
 ### Leiningen/Boot
 ```clojure
-[org.clojars.quoll/tiara "0.3.6"]
+[org.clojars.quoll/tiara "0.3.7"]
 ```
 
 ## Usage
