@@ -11,16 +11,16 @@
 
 (definline indirect
   "This get operation is used in multiple places, and can be inlined.
-  Possibly redundant with (indirect-nd index entry-vector k nil)"
+  Possibly redundant with (indirect-nf index entry-vector k nil)"
   [index entry-vector k]
   `(when-let [n# (~index ~k)]
-     (val (nth ~entry-vector n#))))
+     (.val ^MapEntry (~entry-vector n#))))
 
 (definline indirect-nf
   "This alternative get operation is used in multiple places, and can be inlined."
   [index entry-vector k not-found]
   `(if-let [n# (~index ~k)]
-     (val (nth ~entry-vector n#))
+     (.val ^MapEntry (~entry-vector n#))
      ~not-found))
 
 (declare transient-ordered-map)
@@ -38,7 +38,7 @@
   IPersistentMap
   (assoc [this k v]
     (if-let [n (idx k)]
-      (if (= (val (nth lst n)) v)
+      (if (= (.val ^MapEntry (nth lst n)) v)
         this
         (VecMap. (assoc lst n (MapEntry/create k v)) idx))
       (VecMap. (conj lst (MapEntry/create k v)) (assoc idx k (count lst)))))
@@ -50,14 +50,14 @@
     (if-let [split (get idx k)]
       (VecMap. (into (subvec lst 0 split) (subvec lst (inc split)))
                (reduce (fn [index n]
-                         (let [k (key (nth lst n))]
+                         (let [k (.key ^MapEntry (lst n))]
                            (update index k dec)))
                        (dissoc idx k)
                        (range (inc split) (count lst))))
       this))
   (iterator [this] (.iterator ^Collection lst))
   (containsKey [this k] (contains? idx k))
-  (entryAt [this k] (when-let [n (idx k)] (nth lst n)))
+  (entryAt [this k] (when-let [n (idx k)] (lst n)))
   (count [this] (count lst))
   (cons [this [k v]] (.assoc this k v))
   (empty [this] (VecMap. [] (.withMeta ^IObj {} (.meta ^IObj idx))))
@@ -121,10 +121,10 @@
 (deftype TransientVecMap [^ITransientVector lst ^ITransientMap idx]
   ITransientMap
   (assoc [this k v]
-    (if-let [n (get idx k)]
-      (if (= (val (nth lst n)) v)
+    (if-let [n (idx k)]
+      (if (= (.val ^MapEntry (lst n)) v)
         this
-        (let [nlst (.assoc lst n (MapEntry/create k v))]
+        (let [nlst (.assoc ^ITransientVector lst n (MapEntry/create k v))]
           (if (identical? nlst lst)
             this
             (TransientVecMap. nlst idx))))
@@ -140,7 +140,7 @@
         (TransientVecMap. (reduce conj! (transient (transiable-subvec plst 0 split)) (subvec plst (inc split)))
                           (reduce (fn [index n]
                                     (let [k (key (nth plst n))]
-                                      (assoc! index k (dec (get index k)))))
+                                      (assoc! index k (dec (index k)))))
                                   (dissoc! idx k)
                                   (range (inc split) (count plst)))))
       this))
