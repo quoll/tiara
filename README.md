@@ -1,5 +1,5 @@
 # Tiara
-A small data structure library for Clojure and ClojureScript.
+A small data structure library of ordered maps and sets in Clojure and ClojureScript.
 
 ### deps.edn
 
