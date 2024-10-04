@@ -58,7 +58,7 @@ Ordered Sets are the same as other sets, but can be created using `ordered-set` 
 ```
 
 ## Motivation
-I am often encountering cases where I need to append data to a structure that will be written out in the same order it was encountered. However, duplicates of a simple piece of data should not be duplicated, or for more complex data, they should be merged with previous encountered information. These ordered sets and maps are ideal for this operation.
+I often encounter cases where I need to append data to a structure that will be written out in the same order it was read. However, duplicates of a simple piece of data should not be duplicated, or for more complex data, they should be merged with previously encountered information. These ordered sets and maps are ideal for this operation.
 
 While it would be possible to use Java's [LinkedHashMap](https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/util/LinkedHashMap.html) and [LinkedHashSets](https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/util/LinkedHashSet.html), these are not immutable structures, and hence are not ideal for functional programming. I suspected that an immutable equivalent may have existed, but the required functionality did not appear difficult and I thought it would be an interesting learning experience to write my own version.
 
@@ -112,7 +112,7 @@ To avoid access patterns, the initial data was generated with:
 (def data (shuffle (range 1000000)))
 ```
 
-The numbers presented here are on a 14-inch MacBook Pro, 2021, with an M1 chip. Three benchmarks were executed for each operation on each library. The best time out of the 3 was selected, though the results were generally consistent.
+The numbers presented here are on JDK 21, running on a 14-inch MacBook Pro, Nov 2023, with an M3 Max chip. Three benchmarks were executed for each operation on each library. The best time out of the 3 was selected, though the results were generally consistent.
 
 ### Inserting Data
 ```clojure
@@ -123,15 +123,15 @@ The numbers presented here are on a 14-inch MacBook Pro, 2021, with an M1 chip. 
 
 |Library|Time (ms)|Std Dev (ms)|
 |-------|---------|------------|
-|Linked|1384.5|72.6|
-|Ordered|578.3|81.3|
-|Tiara|422.7|40.0|
+|Linked|839.4|36.3|
+|Ordered|365.4|106.3|
+|Tiara|341.0|30.6|
 
-Ordered used to be the fastest here, by a slim margin over Tiara. However, Tiara did not include Transient versions of the data Structures. Since these were introduced, the timing has improved by about 30%. Linked was the slowest by a long way, which reflects the multiple updates required for each insertion.
+Ordered used to be the fastest here, by a slim margin over Tiara. However, Tiara did not include Transient versions of the data Structures. Since these were introduced, the timing has improved by about 30%. Linked was the slowest by a long way, which reflects the multiple updates required for each insertion. Note that Ordered has a standard deviation of 29%.
 
-**However**, after saving each of these maps (shown in the next test), attempting to run this benchmark on Ordered led to Heap Exhaustion! This problem did not affect either Linked or Tiara. Restarting the repl with a larger heap allowed this test to proceed.
+**However**, after saving each of these maps (shown in the next test), attempting to run this benchmark on Ordered led to Heap Exhaustion! This problem did not affect either Linked or Tiara. Restarting the repl with a larger heap allowed this test to proceed. This high memory usage also explains the high standard deviation, since heap access (and potentially garbage collection) becomes an issue.
 
-### Access
+### Random Access
 Using the same data, the maps were saved:
 ```clojure
 (def linked (into (linked.core/map) (map (fn [n] [n n]) data)))
@@ -147,15 +147,15 @@ Using the randomized data as keys, each value was looked up and added to an accu
 
 |Library|Time (ms)|Std Dev (ms)|
 |-------|---------|------------|
-|Linked|371.2|83.8|
-|Ordered|452.1|53.4|
-|Tiara|311.2|27.4|
+|Linked|127.2|7.9|
+|Ordered|121.8|8.0|
+|Tiara|142.5|10.1|
 
-Linked and Tiara are close, though Tiara was consistently faster. I suspect that this is because there is overhead in accessing fields in the `Node` records that are defined in that namespace when compared to accessing the `value` field of the `MapEntry` that is defined in Java code.
+All three are relatively close with Tiara being 17% slower than Ordered. This has changed since 2023, when Tiara used to be slightly faster. Ordered used to be quite a bit slower than the other 2, but has since become the fastest.
 
-Ordered is quite a bit slower, most likely because it has to follow 2 levels of indirection, getting the `MapEntry` value stored as the value in the backing map, and then getting the nested `MapEntry` before getting the value.
+Strangely, over multiple runs both Linked and Ordered kept returning better values (starting at only 6% faster than Tiara), but as they kept returning slightly faster values, Tiara ran with an almost identical average every time. This goes against my intuition since Linked and Ordered also have smaller standard deviations, so I wouldn't have expected to see them move their average down. I anticipate that these differences came from a different distribution of the random data each time. (The same data was run against all 3 libraries each time).
 
-### Seq
+### Seq Processing
 The reason for this data structure is to be able to return data in order, so the next test was to look at that. Accessing the vals means pulling data out of the ordering, which may be different to getting the full seq, so I looked at both. I started by looking at the vals:
 ```clojure
 (bench (reduce + 0 (vals linked)))
@@ -165,14 +165,15 @@ The reason for this data structure is to be able to return data in order, so the
 
 |Library|Time (ms)|Std Dev (ms)|
 |-------|---------|------------|
-|Linked|390.3|5.8|
-|Ordered|43.4|1.6|
-|Tiara|41.0|0.5|
+|Linked|332.5|15.7|
+|Ordered|48.2|1.3|
+|Tiara|18.9|0.4|
 
 Ordered and Tiara are about the same here. The small difference could just be noise, but there did seem to be a consistent difference. This would be due to the wrapping `keep identity` operation over the vector that filters out any `nil` values in Ordered.
 
 Linked is the outlier, due to its need to access the map in each step along the linked list.
 
+### Seq API
 Next, I looked at seqs, iterating over each entry, but ignoring the values:
 ```clojure
 (bench (reduce (fn [a _] (inc a)) 0 (seq linked)))
@@ -182,21 +183,21 @@ Next, I looked at seqs, iterating over each entry, but ignoring the values:
 
 |Library|Time (ms)|Std Dev (ms)|
 |-------|---------|------------|
-|Linked|375.3|7.3|
-|Ordered|16.1|0.6|
-|Tiara|10.3|0.5|
+|Linked|322.2|28.5|
+|Ordered|6.0|0.1|
+|Tiara|2.4|0.1|
 
-This test wasn't actually fair, since Tiara already had the seq ready to return, while Ordered needed to create `MapEntry` objects for each element. Ordered still does well though.
+Tiara has an advantage in this test, since it already has the seq ready to return, while Ordered needed to create `MapEntry` objects for each element. Ordered still does well though.
 
 ### Result
-When not removing items, Tiara seems to be slightly better in performance than Ordered, and quite a lot better than Linked.
+When not removing items, Tiara seems to have slightly better performance than Ordered, and quite a lot better than Linked. While slower (17%) in random access, this is not a common use case for this kind of data structure.
 
-Both Linked and Tiara seem to have better memory consumption profiles. After testing both for some time, neither had any errors at all. As soon as Ordered was tested it led to heap errors despite restarts. Admittedly, there were 2 maps of 1 million items present and 2 to be cleaned by the GC, but this had not been a problem with the other libraries.
+Both Linked and Tiara seem to have better memory consumption profiles. Ordered used to have heap exhaustion issues, but this appears to have improved.
 
-For access patterns that do not require significant removals, then this library should provide some benefits.
+For access patterns that do not require significant removals, then Tiara should provide some benefits.
 
 ## License
 
-Copyright © 2023 Paula Gearon
+Copyright © 2023, 2024 Paula Gearon
 
 Distributed under the Eclipse Public License version 2.0.
