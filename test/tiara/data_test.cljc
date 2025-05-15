@@ -28,6 +28,13 @@
     (is (= (apply hash-map (make-kv-range 20))
            (apply ordered-map (make-kv-range 20))))))
 
+(deftest test-map-hash-equiv
+  (testing "map hash equivalence for constructed maps"
+    (is (= (hash (apply ordered-map (make-kv-range 8)))
+           (hash (apply array-map (make-kv-range 8)))))
+    (is (= (hash (apply ordered-map (make-kv-range 20)))
+           (hash (apply hash-map (make-kv-range 20)))))))
+
 (deftest test-seq
   (testing "seq functionality of a map"
     (is (= (map (juxt make-key identity) (range 20))
@@ -148,6 +155,18 @@
            (apply hash-set (krange 20))))
     (is (= (apply hash-set (krange 20))
            (apply ordered-set (krange 20))))))
+
+(deftest test-set-hash-equiv
+  (testing "set equivalence for constructed sets"
+    (is (= (hash (apply ordered-set (range 8)))
+           (hash (set (range 8)))))
+    (is (= (hash (apply ordered-set (range 20)))
+           (hash (apply hash-set (range 20))))))
+  (testing "set equivalence for constructed sets with keyword entries"
+    (is (= (hash (apply ordered-set (krange 8)))
+           (hash (set (krange 8)))))
+    (is (= (hash (apply ordered-set (krange 20)))
+           (hash (apply hash-set (krange 20)))))))
 
 (deftest test-set-seq
   (testing "seq functionality of a set"

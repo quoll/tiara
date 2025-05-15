@@ -1,7 +1,7 @@
 (ns tiara.data
   "Divergent data structures"
   {:author "Paula Gearon"}
-  (:import [clojure.lang IFn APersistentMap APersistentSet MapEntry ISeq
+  (:import [clojure.lang IFn APersistentMap APersistentSet MapEntry
             IPersistentMap IPersistentSet IHashEq IObj MapEquivalence
             IEditableCollection ITransientVector ITransientMap ITransientSet]
            [java.util Map Set Collection]))
@@ -14,18 +14,18 @@
   Possibly redundant with (indirect-nf index entry-vector k nil)"
   [index entry-vector k]
   `(when-let [n# (~index ~k)]
-     (.val ^MapEntry (~entry-vector n#))))
+     (.val ^MapEntry (nth ~entry-vector n#))))
 
 (definline indirect-nf
   "This alternative get operation is used in multiple places, and can be inlined."
   [index entry-vector k not-found]
   `(if-let [n# (~index ~k)]
-     (.val ^MapEntry (~entry-vector n#))
+     (.val ^MapEntry (nth ~entry-vector n#))
      ~not-found))
 
 (declare transient-ordered-map)
 
-(deftype VecMap [lst idx]
+(deftype VecMap [lst idx ^int _hash]
   IFn
   (invoke [this k] (indirect idx lst k))
   (invoke [this k not-found] (indirect-nf idx lst k not-found))
@@ -40,8 +40,8 @@
     (if-let [n (idx k)]
       (if (= (.val ^MapEntry (nth lst n)) v)
         this
-        (VecMap. (assoc lst n (MapEntry/create k v)) idx))
-      (VecMap. (conj lst (MapEntry/create k v)) (assoc idx k (count lst)))))
+        (VecMap. (assoc lst n (MapEntry/create k v)) idx 0))
+      (VecMap. (conj lst (MapEntry/create k v)) (assoc idx k (count lst)) 0)))
   (assocEx [this k v]
     (if (contains? idx k)
       (throw (ex-info "Key already present" {:key k}))
@@ -50,17 +50,18 @@
     (if-let [split (get idx k)]
       (VecMap. (into (subvec lst 0 split) (subvec lst (inc split)))
                (reduce (fn [index n]
-                         (let [k (.key ^MapEntry (lst n))]
+                         (let [k (.key ^MapEntry (nth lst n))]
                            (update index k dec)))
                        (dissoc idx k)
-                       (range (inc split) (count lst))))
+                       (range (inc split) (count lst)))
+               0)
       this))
   (iterator [this] (.iterator ^Collection lst))
   (containsKey [this k] (contains? idx k))
-  (entryAt [this k] (when-let [n (idx k)] (lst n)))
+  (entryAt [this k] (when-let [n (idx k)] (nth lst n)))
   (count [this] (count lst))
   (cons [this [k v]] (.assoc this k v))
-  (empty [this] (VecMap. [] (.withMeta ^IObj {} (.meta ^IObj idx))))
+  (empty [this] (VecMap. [] (.withMeta ^IObj {} (.meta ^IObj idx)) 0))
   (equiv [this o]
     (if (instance? IPersistentMap o)
       (and (instance? MapEquivalence o) (APersistentMap/mapEquals this o))
@@ -73,10 +74,13 @@
   (asTransient [this] (transient-ordered-map lst idx))
 
   IHashEq
-  (hasheq [this] (+ magic (.hasheq ^IHashEq lst)))
+  (hasheq [this]
+    (if (zero? _hash)
+      (set! (. this _hash) (clojure.lang.Murmur3/hashUnordered this))
+      _hash))
   
   IObj
-  (withMeta [this meta] (VecMap. lst (.withMeta ^IObj idx meta)))
+  (withMeta [this meta] (VecMap. lst (.withMeta ^IObj idx meta) 0))
   (meta [this] (.meta ^IObj idx))
 
   MapEquivalence
@@ -98,7 +102,7 @@
   Object
   (toString [this] (clojure.lang.RT/printString this)))
 
-(def EMPTY_MAP (VecMap. [] {}))
+(def EMPTY_MAP (VecMap. [] {} 0))
 
 (defn ordered-map
   "Creates a map object that remembers the insertion order, similarly to a java.util.LinkedHashMap"
@@ -110,7 +114,8 @@
               (into [] (comp (take-nth 2) (distinct)) keyvals))]
      (VecMap.
       (mapv #(find m %) ks)
-      (zipmap ks (range))))))
+      (zipmap ks (range))
+      0))))
 
 (definline transiable-subvec
   "Get a subvec into a vector that can be made transient, skipping some of the steps
@@ -122,7 +127,7 @@
   ITransientMap
   (assoc [this k v]
     (if-let [n (idx k)]
-      (if (= (.val ^MapEntry (lst n)) v)
+      (if (= (.val ^MapEntry (nth lst n)) v)
         this
         (let [nlst (.assoc ^ITransientVector lst n (MapEntry/create k v))]
           (if (identical? nlst lst)
@@ -152,7 +157,7 @@
       (val (nth lst n))
       not-found))
   (count [this] (count lst))
-  (persistent [this] (VecMap. (.persistent lst) (.persistent idx)))
+  (persistent [this] (VecMap. (.persistent lst) (.persistent idx) 0))
   (conj [this [k v]] (.assoc this k v))
 
   IFn
@@ -170,7 +175,7 @@
 
 (declare transient-ordered-set)
 
-(deftype VecSet [^VecMap om]
+(deftype VecSet [^VecMap om ^int _hash]
   IFn
   (invoke [this k] (.invoke om k))
   (invoke [this k not-found] (.invoke om k not-found))
@@ -181,12 +186,12 @@
                       (throw (clojure.lang.ArityException. (count s) "Set.invoke"))))
 
   IPersistentSet
-  (disjoin [this k] (VecSet. (.without om k)))
+  (disjoin [this k] (VecSet. (.without om k) 0))
   (contains [this k] (.containsKey om k))
   (get [this k] (.get om k))
   (count [this] (.count om))
-  (cons [this o] (VecSet. (.assoc om o o)))
-  (empty [this] (VecSet. EMPTY_MAP))
+  (cons [this o] (VecSet. (.assoc om o o) 0))
+  (empty [this] (VecSet. EMPTY_MAP 0))
   (equiv [this o] (APersistentSet/setEquals this o))
   (seq [this] (keys om))
 
@@ -206,10 +211,13 @@
   (toArray [this] (clojure.lang.RT/seqToArray (keys om)))
 
   IHashEq
-  (hasheq [this] (+ set-magic (.hasheq om)))
+  (hasheq [this]
+    (if (zero? _hash)
+      (set! (. this _hash) (clojure.lang.Murmur3/hashUnordered (keys om)))
+      _hash))
 
   IObj
-  (withMeta [this meta] (VecSet. (.withMeta om meta)))
+  (withMeta [this meta] (VecSet. (.withMeta om meta) _hash))
   (meta [this] (.meta om))
 
   IEditableCollection
@@ -218,13 +226,13 @@
   Object
   (toString [this] (clojure.lang.RT/printString this)))
 
-(def EMPTY_SET (VecSet. EMPTY_MAP))
+(def EMPTY_SET (VecSet. EMPTY_MAP 0))
 
 (defn ordered-set
   "Creates a set object that remembers the insertion order, similarly to a java.util.LinkedHashSet"
   ([] EMPTY_SET)
   ([& s]
-   (VecSet. (apply ordered-map (mapcat #(repeat 2 %) s)))))
+   (VecSet. (apply ordered-map (mapcat #(repeat 2 %) s)) 0)))
 
 (defn oset
   "Convenience function to create an ordered set from a seq"
@@ -248,7 +256,7 @@
   (contains [this k]
     (boolean (.valAt ^ITransientVector (:lst om) k)))  ;; ensures that nil members are reported correctly
   (persistent [this]
-    (VecSet. (.persistent ^TransientVecMap om)))
+    (VecSet. (.persistent ^TransientVecMap om) 0))
 
   IFn
   (invoke [this k] (.get ^ITransientSet this k))

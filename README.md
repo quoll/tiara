@@ -6,12 +6,12 @@ A small data structure library of ordered maps and sets in Clojure and ClojureSc
 Add the following dependency to the :deps map in deps.edn:
 
 ```clojure
-org.clojars.quoll/tiara {:mvn/version "0.3.7"}
+org.clojars.quoll/tiara {:mvn/version "0.4.0"}
 ```
 
 ### Leiningen/Boot
 ```clojure
-[org.clojars.quoll/tiara "0.3.7"]
+[org.clojars.quoll/tiara "0.4.0"]
 ```
 
 ## Usage
@@ -148,8 +148,8 @@ Using the randomized data as keys, each value was looked up and added to an accu
 |Library|Time (ms)|Std Dev (ms)|
 |-------|---------|------------|
 |Linked|119.3|5.4|
-|Ordered|113.6|4.0|
-|Tiara|118.5|5.4|
+|Ordered|112.6|13.5|
+|Tiara|115.0|5.4|
 
 All three are relatively close with Tiara being 4% slower than Ordered. This has changed since 2023, when Tiara used to be slightly faster. Ordered used to be quite a bit slower than the other 2, but has since become the fastest.
 
