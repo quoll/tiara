@@ -314,11 +314,11 @@
   (entryAt [_ k] (.entryAt m k))
   (count [_] (apply + (map count (vals m))))
   (cons [this [k v]] (.assoc this k v))
-  (empty [_] (MultiMap. {} 0))
-  (equiv [this o]
+  (empty [_] (MultiMap. (.withMeta ^IObj {} (.meta ^IObj m)) 0))
+  (equiv [_ o]
     (if (instance? IPersistentMap o)
-      (and (instance? MapEquivalence o) (APersistentMap/mapEquals this o))
-      (APersistentMap/mapEquals this o)))
+      (and (instance? MapEquivalence o) (APersistentMap/mapEquals m o))
+      (APersistentMap/mapEquals m o)))
   (seq [_] (for [[k vs] m v vs] (MapEntry/create k v)))
   (valAt [_ k] (m k))
   (valAt [_ k not-found] (m k not-found))
@@ -362,7 +362,7 @@
       (if (contains? vs v)
         this
         (TransientMultiMap. (assoc! m k (conj vs v)) (inc count*)))
-      (TransientVecMap. (assoc! m k #{v}) (inc count*))))
+      (TransientMultiMap. (assoc! m k #{v}) (inc count*))))
   (without [this entry]
     (if-let [[k v] (cond
                      (instance? Map$Entry entry) [(.getKey ^Map$Entry entry) (.getValue ^Map$Entry entry)]
@@ -405,4 +405,4 @@
   ([] EMPTY_MULTI_MAP)
   ([& keyvals]
    (let [kvs (partition 2 keyvals)]
-     (into (transient EMPTY_MULTI_MAP) (map #(apply MapEntry/create %)) kvs))))
+     (into EMPTY_MULTI_MAP (map #(apply MapEntry/create %)) kvs))))
