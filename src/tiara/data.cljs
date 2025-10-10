@@ -61,19 +61,19 @@
 
   ISeqable
   (-seq [_] (-seq lst))
-  
+
   IDrop
-  (-drop [_ n] (-drop n lst))
+  (-drop [_ n] (drop n (-seq lst)))
 
   ICounted
   (-count [_] (-count lst))
 
   ILookup
   (-lookup [_ k] (when-let [n (-lookup idx k)]
-                      (val (-nth lst n))))
+                   (val (-nth lst n))))
   (-lookup [_ k not-found] (if-let [n (-lookup idx k)]
-                                (-val (-nth lst n))
-                                not-found))
+                             (-val (-nth lst n))
+                             not-found))
   IAssociative
   (-assoc [this k v]
     (if-let [n (-lookup idx k)]
@@ -81,7 +81,7 @@
         this
         (VecMap. (-assoc lst n (MapEntry. k v nil)) idx nil))
       (VecMap. (conj lst (MapEntry. k v nil)) (-assoc idx k (count lst)) nil)))
-  (-contains-key? [_ k] (-contain-key? idx k))
+  (-contains-key? [_ k] (-contains-key? idx k))
 
   IFind
   (-find [_ k] (when-let [n (idx k)] (-nth lst n)))
@@ -162,7 +162,7 @@
 
   ITransientAssociative
   (-assoc! [this k v]
-    (if-let [n (.get idx k)]
+    (if-let [n (-lookup idx k)]
       (when (not= (val (-nth lst n)) v)
         (let [nlst (-assoc! lst n (MapEntry. k v nil))]
           (when-not (identical? nlst lst)
@@ -177,13 +177,13 @@
 
   ITransientMap
   (-dissoc! [this k]
-    (when-let [split (.get idx k)]
+    (when-let [split (-lookup idx k)]
       (let [plst (-persistent! lst)
             nlst (reduce conj! (transient (transiable-subvec plst 0 split)) (subvec plst (inc split)))
             nidx (reduce (fn [index n]
                            (let [k (-key (nth plst n))]
-                             (.assoc! index k (dec (get index k)))))
-                         (.dissoc! idx k)
+                             (-assoc! index k (dec (-lookup index k)))))
+                         (-dissoc! idx k)
                          (range (inc split) (count plst)))]
         (set! lst nlst)
         (set! idx nidx)))
@@ -294,7 +294,7 @@
 
   ITransientSet
   (-disjoin! [this v]
-    (set! om (dissoc! om v))
+    (set! om (-dissoc! om v))
     this)
 
   ICounted
@@ -343,7 +343,7 @@
   (-conj [this [k v]] (-assoc this k v))
 
   IEmptyableCollection
-  (-empty [_] (MultiMap. (with-meta {} (-meta m)) #'cljs.core/empty-unordered-hash))
+  (-empty [_] (MultiMap. (with-meta {} (-meta m)) 0 #'cljs.core/empty-unordered-hash))
 
   IEquiv
   (-equiv [this o]
@@ -433,7 +433,7 @@
   (-conj! [this [k v]]
     (-assoc! this k v))
   (-persistent! [_]
-    (MultiMap. (-persistent! m) count*))
+    (MultiMap. (-persistent! m) count* nil))
 
   ITransientAssociative
   (-assoc! [this k v]
@@ -457,12 +457,12 @@
         (let [vsn (-disjoin vs v)]
           (when-not (identical? vsn vs)
             (let [nm (if (seq vsn)
-                       (-assoc! m k vsn)
-                       (-dissoc! m k))]
+                       (.assoc! m k vsn)
+                       (.without! m k))]
               (set! m nm)
               (set! count* (dec count*))))))
       (when-let [vs (-lookup m entry)]
-        (let [nm (-dissoc! m entry)]
+        (let [nm (.without! m entry)]
           (set! m nm)
           (set! count* (- count* (-count vs))))))
     this)
@@ -475,7 +475,7 @@
   [m]
   (TransientMultiMap. m (count m)))
 
-(def EMPTY_MULTI_MAP (MultiMap. {} 0))
+(def EMPTY_MULTI_MAP (MultiMap. {} 0 #'cljs.core/empty-unordered-hash))
 
 (defn multi-map
   "Creates a map object that accepts multiple values per key"

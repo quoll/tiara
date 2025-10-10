@@ -7,7 +7,7 @@
 (def lib 'org.clojars.quoll/tiara)
 (def version "0.4.0")
 
-;; clojure -X:build
+;; clojure -T:build test
 (defn test "Run the tests." [opts]
   (bb/run-tests opts))
 
