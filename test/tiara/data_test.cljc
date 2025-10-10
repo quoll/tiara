@@ -1,8 +1,7 @@
 (ns tiara.data-test
   (:require [clojure.test :refer [deftest testing is]]
             [tiara.data :refer [ordered-map EMPTY_MAP ordered-set oset EMPTY_SET
-                                multi-map EMPTY_MULTI_MAP]])
-  (:import [tiara.data MultiMap]))
+                                multi-map EMPTY_MULTI_MAP]]))
 
 #?(:clj (set! *warn-on-reflection* true))
 
@@ -235,7 +234,7 @@
    (alter-var-root #'=
                    (fn [eq] (fn
                               ([_] true)
-                              ([x y] (if (instance? MultiMap y) (eq y x) (eq x y)))
+                              ([x y] (if (instance? tiara.data.MultiMap y) (eq y x) (eq x y)))
                               ([x y & more] (apply eq x y more))))))
 #?(:clj
    (deftest test-multi-construct
