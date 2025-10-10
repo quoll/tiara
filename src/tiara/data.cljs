@@ -2,9 +2,6 @@
   "Divergent data structures"
   {:author "Paula Gearon"})
 
-(def ^:const magic 7)
-(def ^:const set-magic 11)
-
 (def ^:private sentinel (deref #'cljs.core/lookup-sentinel))
 
 (declare transient-ordered-map transient-ordered-set transient-multi-map)
@@ -17,7 +14,7 @@
       (set! s (next s))
       ret)))
 
-(deftype VecMap [lst idx]
+(deftype VecMap [lst idx ^:mutable __hash]
   Object
   (toString [this] (pr-str* this))
   (equiv [this other] (-equiv this other))
@@ -31,19 +28,19 @@
       (f v k)))
 
   ICloneable
-  (-clone [_] (VecMap. lst idx))
+  (-clone [_] (VecMap. lst idx nil))
 
   IMeta
   (-meta [_] (-meta idx))
 
   IWithMeta
-  (-with-meta [_ meta] (VecMap. lst (-with-meta idx meta)))
+  (-with-meta [_ meta] (VecMap. lst (-with-meta idx meta) __hash))
 
   ICollection
   (-conj [this [k v]] (-assoc this k v))
 
   IEmptyableCollection
-  (-empty [_] (VecMap. [] (-with-meta {} (-meta idx))))
+  (-empty [_] (VecMap. [] (-with-meta {} (-meta idx)) #'cljs.core/empty-unordered-hash))
 
   IEquiv
   (-equiv [_ o]
@@ -57,7 +54,7 @@
                   lst))))
 
   IHash
-  (-hash [_] (+ magic (hash lst)))
+  (-hash [this] (caching-hash this hash-unordered-coll __hash))
 
   IIterable
   (-iterator [_] (MapEntryIterator. lst))
@@ -82,9 +79,9 @@
     (if-let [n (-lookup idx k)]
       (if (= (-val (-nth lst n)) v)
         this
-        (VecMap. (-assoc lst n (MapEntry. k v nil)) idx))
-      (VecMap. (conj lst (MapEntry. k v nil)) (-assoc idx k (count lst)))))
-  (-contains-key? [_ k] (-contains-key? idx k))
+        (VecMap. (-assoc lst n (MapEntry. k v nil)) idx nil))
+      (VecMap. (conj lst (MapEntry. k v nil)) (-assoc idx k (count lst)) nil)))
+  (-contains-key? [_ k] (-contain-key? idx k))
 
   IFind
   (-find [_ k] (when-let [n (idx k)] (-nth lst n)))
@@ -97,7 +94,8 @@
                          (let [k (key (nth lst n))]
                            (update index k dec)))
                        (-dissoc idx k)
-                       (range (inc split) (count lst))))
+                       (range (inc split) (count lst)))
+               nil)
       this))
 
   IKVReduce
@@ -117,7 +115,7 @@
   IEditableCollection
   (-as-transient [_] (transient-ordered-map lst idx)))
 
-(def EMPTY_MAP (VecMap. [] {}))
+(def EMPTY_MAP (VecMap. [] {} #'cljs.core/empty-unordered-hash))
 
 (defn ordered-map
   "Creates a map object that remembers the insertion order, similarly to a java.util.LinkedHashMap"
@@ -129,7 +127,8 @@
               (into [] (comp (take-nth 2) (distinct)) keyvals))]
      (VecMap.
        (mapv #(find m %) ks)
-       (zipmap ks (range))))))
+       (zipmap ks (range))
+       nil))))
 
 (defn- transiable-subvec
   "Get a subvec into a vector that can be made transient."
@@ -159,7 +158,7 @@
                 (recur (next es) (-assoc! coll (-key e) (-val e)))
                 coll))))
   (-persistent! [_]
-    (VecMap. (persistent! lst) (persistent! idx)))
+    (VecMap. (persistent! lst) (persistent! idx) nil))
 
   ITransientAssociative
   (-assoc! [this k v]
@@ -198,7 +197,9 @@
   [lst idx]
   (TransientVecMap. (transient lst) (transient idx)))
 
-(deftype VecSet [om]
+(declare transient-ordered-set)
+
+(deftype VecSet [om ^:mutable __hash]
   Object
   (toString [this] (pr-str* this))
   (equiv [this o] (-equiv this o))
@@ -209,7 +210,7 @@
   (forEach [_ f] (doseq [[k v] om] (f v k)))
 
   ICloneable
-  (-clone [_] (VecSet. om))
+  (-clone [_] (VecSet. om __hash))
 
   IIterable
   (-iterator [_] (MapEntryIterator. (keys om)))
@@ -218,16 +219,16 @@
   (-with-meta [this new-meta]
     (if (identical? new-meta (-meta om))
       this
-      (VecSet. (-with-meta om new-meta))))
+      (VecSet. (-with-meta om new-meta) __hash)))
 
   IMeta
   (-meta [_] (-meta om))
 
   ICollection
-  (-conj [_ o] (VecSet. (assoc om o o)))
+  (-conj [_ o] (VecSet. (assoc om o o) nil))
 
   IEmptyableCollection
-  (-empty [_] (-with-meta EMPTY_MAP (-meta om)))
+  (-empty [_] (VecSet. (-with-meta EMPTY_MAP (-meta om)) #'cljs.core/empty-unordered-hash))
 
   IEquiv
   (-equiv [_ other]
@@ -243,7 +244,7 @@
          false))))
 
   IHash
-  (-hash [_] (+ set-magic (-hash om)))
+  (-hash [this] (caching-hash this hash-unordered-coll __hash))
 
   ISeqable
   (-seq [_] (.keys om))
@@ -259,7 +260,7 @@
       not-found))
 
   ISet
-  (-disjoin [_ v] (VecSet. (-dissoc om v)))
+  (-disjoin [_ v] (VecSet. (-dissoc om v) nil))
 
   IFn
   (-invoke [this k] (-lookup this k))
@@ -271,13 +272,13 @@
   IEditableCollection
   (-as-transient [_] (transient-ordered-set om)))
 
-(def EMPTY_SET (VecSet. EMPTY_MAP))
+(def EMPTY_SET (VecSet. EMPTY_MAP #'cljs.core/empty-unordered-hash))
 
 (defn ordered-set
   "Creates a set object that remembers the insertion order, similarly to a java.util.LinkedHashSet"
   ([] EMPTY_SET)
   ([& s]
-   (VecSet. (apply ordered-map (mapcat #(repeat 2 %) s)))))
+   (VecSet. (apply ordered-map (mapcat #(repeat 2 %) s)) nil)))
 
 (defn oset
   "Convenience function to create an ordered set from a seq"
@@ -289,7 +290,7 @@
   (-conj! [this o]
     (set! om (-assoc! om o o))
     this)
-  (-persistent! [_] (VecSet. (persistent! om)))
+  (-persistent! [_] (VecSet. (persistent! om) nil))
 
   ITransientSet
   (-disjoin! [this v]
@@ -316,7 +317,7 @@
   [os]
   (TransientVecSet. (-as-transient os)))
 
-(deftype MultiMap [m count*]
+(deftype MultiMap [m count* ^:mutable __hash]
   Object
   (toString [this] (pr-str* this))
   (equiv [this other] (-equiv this other))
@@ -330,19 +331,19 @@
       (f v k)))
 
   ICloneable
-  (-clone [_] (MultiMap. m count*))
+  (-clone [_] (MultiMap. m count* __hash))
 
   IMeta
   (-meta [_] (-meta m))
 
   IWithMeta
-  (-with-meta [_ meta] (MultiMap. (-with-meta m meta) count*))
+  (-with-meta [_ meta] (MultiMap. (-with-meta m meta) count* __hash))
 
   ICollection
   (-conj [this [k v]] (-assoc this k v))
 
   IEmptyableCollection
-  (-empty [_] (MultiMap. (with-meta {} (-meta m)) 0))
+  (-empty [_] (MultiMap. (with-meta {} (-meta m)) #'cljs.core/empty-unordered-hash))
 
   IEquiv
   (-equiv [this o]
@@ -356,7 +357,7 @@
                   m))))
 
   IHash
-  (-hash [_] (+ magic (-hash m)))
+  (-hash [this] (caching-hash this hash-unordered-coll __hash))
 
   IIterable
   (-iterator [this] (MapEntryIterator. (-seq this)))
@@ -379,8 +380,8 @@
     (if-let [vs (-lookup m k)]
       (if (contains? vs v)
         this
-        (MultiMap. (-assoc m k (-conj vs v)) (inc count*)))
-      (MultiMap. (-assoc m k #{v}) (inc count*))))
+        (MultiMap. (-assoc m k (-conj vs v)) (inc count*) nil))
+      (MultiMap. (-assoc m k #{v}) (inc count*) nil)))
   (-contains-key? [_ k] (-contains-key? m k))
 
   IFind
@@ -394,11 +395,11 @@
       (if-let [vs (-lookup m k)]
         (if (contains? vs v)
           (let [vsn (-disjoin vs v)]
-            (MultiMap. (if (seq vsn) (-assoc m k vsn) (-dissoc m k)) (dec count*)))
+            (MultiMap. (if (seq vsn) (-assoc m k vsn) (-dissoc m k)) (dec count*) nil))
           this)
         this)
       (if-let [vs (-lookup m entry)]
-        (MultiMap. (-dissoc m entry) (- count* (-count vs)))
+        (MultiMap. (-dissoc m entry) (- count* (-count vs)) nil)
         this)))
 
   IKVReduce
