@@ -273,7 +273,7 @@
 
 (declare transient-multi-map)
 
-(deftype MultiMap [m ^int _hash]
+(deftype MultiMap [m ^int _hash ^int count*]
   IFn
   (invoke [_ k] (m k))
   (invoke [_ k not-found] (m k not-found))
@@ -288,8 +288,8 @@
     (if-let [n (m k)]
       (if (contains? n v)
         this
-        (MultiMap. (assoc m k (conj n v)) 0))
-      (MultiMap. (assoc m k #{v}) 0)))
+        (MultiMap. (assoc m k (conj n v)) 0 (inc count*)))
+      (MultiMap. (assoc m k #{v}) 0 (inc count*))))
   (assocEx [this k v]
     (when-let [vs (contains? m k)]
       (when (contains? vs v)
@@ -304,17 +304,19 @@
         (if (contains? vs v)
           (let [vsm (disj vs v)]
             (if (seq vsm)
-              (MultiMap. (assoc m k vsm) 0)
-              (MultiMap. (dissoc m k) 0)))
+              (MultiMap. (assoc m k vsm) 0 (dec count*))
+              (MultiMap. (dissoc m k) 0 (dec count*))))
           this)
         this)
-      (MultiMap. (dissoc m entry) 0)))
+      (if-let [vs (get m entry)]
+        (MultiMap. (dissoc m entry) 0 (- count* (count vs)))
+        this)))
   (iterator [_] (.iterator ^Collection (for [[k vs] m v vs] (MapEntry/create k v))))
   (containsKey [_ k] (contains? m k))
   (entryAt [_ k] (.entryAt m k))
-  (count [_] (apply + (map count (vals m))))
+  (count [_] count*)
   (cons [this [k v]] (.assoc this k v))
-  (empty [_] (MultiMap. (.withMeta ^IObj {} (.meta ^IObj m)) 0))
+  (empty [_] (MultiMap. (.withMeta ^IObj {} (.meta ^IObj m)) 0 0))
   (equiv [_ o]
     (if (instance? IPersistentMap o)
       (and (instance? MapEquivalence o) (APersistentMap/mapEquals m o))
@@ -324,7 +326,7 @@
   (valAt [_ k not-found] (m k not-found))
 
   IEditableCollection
-  (asTransient [_] (transient-multi-map m))
+  (asTransient [_] (transient-multi-map m count*))
 
   IHashEq
   (hasheq [this]
@@ -333,7 +335,7 @@
       _hash))
 
   IObj
-  (withMeta [_ meta] (MultiMap. (.withMeta ^IObj m meta) _hash))
+  (withMeta [_ meta] (MultiMap. (.withMeta ^IObj m meta) _hash count*))
   (meta [_] (.meta ^IObj m))
 
   MapEquivalence
@@ -366,7 +368,7 @@
   (without [this entry]
     (if-let [[k v] (cond
                      (instance? Map$Entry entry) [(.getKey ^Map$Entry entry) (.getValue ^Map$Entry entry)]
-                     (instance? MapEntry entry) [(first entry) (second entry)]
+                     (instance? MapEntry entry) [(key entry) (val entry)]
                      (and (vector? entry) (= 2 (count entry))) [(first entry) (second entry)])]
       (if-let [vs (get m k)]
         (if (contains? vs v)
@@ -382,7 +384,7 @@
   (valAt [_ key] (get m key))
   (valAt [_ key not-found] (get m key not-found))
   (count [_] count*)
-  (persistent [_] (MultiMap. (.persistent m) 0))
+  (persistent [_] (MultiMap. (.persistent m) 0 count*))
   (conj [this [k v]] (.assoc this k v))
 
   IFn
@@ -395,10 +397,12 @@
                       (throw (clojure.lang.ArityException. (count s) "Map.invoke")))))
 
 (defn- transient-multi-map
-  [^IEditableCollection m]
-  (TransientMultiMap. (.asTransient m) (count m)))
+  ([^IEditableCollection m]
+   (transient-multi-map m (apply + (map count (vals m)))))
+  ([^IEditableCollection m count*]
+   (TransientMultiMap. (.asTransient m) count*)))
 
-(def EMPTY_MULTI_MAP (MultiMap. {} 0))
+(def EMPTY_MULTI_MAP (MultiMap. {} 0 0))
 
 (defn multi-map
   "Creates a map object that accepts multiple values per key"
