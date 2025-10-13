@@ -273,6 +273,11 @@
 
 (declare transient-multi-map)
 
+(defn- convert-to-multi
+  "Utility function to convert a standard map to a multi-map structure."
+  [m]
+  (into {} (map (fn [[k v]] [k #{v}])) m))
+
 (deftype MultiMap [m ^int _hash ^int count*]
   IFn
   (invoke [_ k] (m k))
@@ -318,9 +323,12 @@
   (cons [this [k v]] (.assoc this k v))
   (empty [_] (MultiMap. (.withMeta ^IObj {} (.meta ^IObj m)) 0 0))
   (equiv [_ o]
-    (if (instance? IPersistentMap o)
-      (and (instance? MapEquivalence o) (APersistentMap/mapEquals m o))
-      (APersistentMap/mapEquals m o)))
+    (cond
+      (instance? MultiMap o) (APersistentMap/mapEquals m (.m o))
+      (instance? IPersistentMap o) (when (instance? MapEquivalence o)
+                                     (or (APersistentMap/mapEquals m o)
+                                         (APersistentMap/mapEquals m (convert-to-multi o))))
+      :else (APersistentMap/mapEquals m o)))
   (seq [_] (for [[k vs] m v vs] (MapEntry/create k v)))
   (valAt [_ k] (m k))
   (valAt [_ k not-found] (m k not-found))

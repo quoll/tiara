@@ -7,7 +7,11 @@
 
 (defn make-key [n] (keyword (str "k" n)))
 
+(defn even-only [s] (map #(if (odd? %) (dec %) %) s))
+
 (defn make-kv-range [n] (interleave (map make-key (range n)) (range n)))
+
+(defn make-multi-kv-range [n] (interleave (map make-key (range n)) (even-only (range n))))
 
 (defn make-map
   [m]
@@ -219,114 +223,139 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; MultiMap testing
 
-#?(:clj
-   (deftest test-multi-get
-     (testing "get works as expected"
-       (is (= #{2} (get (multi-map :a 1 :b 2) :b)))
-       (let [mp (make-map multi-map)]
-         (doseq [n (shuffle (range 20))]
-           (is (= #{n} (get mp (make-key n))))))
-       (is (= #{3} (get (multi-map :a 1 :a 2 :b 3) :b)))
-       (is (= #{3 4} (get (multi-map :a 1 :b 4 :a 2 :b 3) :b))))))
+(deftest test-multi-get
+  (testing "get works as expected"
+    (is (= #{2} (get (multi-map :a 1 :b 2) :b)))
+    (let [mp (make-map multi-map)]
+      (doseq [n (shuffle (range 20))]
+        (is (= #{n} (get mp (make-key n))))))
+    (is (= #{3} (get (multi-map :a 1 :a 2 :b 3) :b)))
+    (is (= #{3 4} (get (multi-map :a 1 :b 4 :a 2 :b 3) :b)))))
 
+;; This is just for testing. We don't really want to monkey-patch clojure.core/= or cljs.core/=
 #?(:clj
-   ;; This is just for testing. We don't really want to monkey-patch clojure.core/=
    (alter-var-root #'=
                    (fn [eq] (fn
                               ([_] true)
                               ([x y] (if (instance? tiara.data.MultiMap y) (eq y x) (eq x y)))
-                              ([x y & more] (apply eq x y more))))))
-#?(:clj
-   (deftest test-multi-construct
-     (testing "equalence of multimaps with maps that use set values"
-       (is (= {:a #{1}} (multi-map :a 1)))
-       (is (= (multi-map :a 1) {:a #{1}}))
-       (is (= {:a #{1} :b #{2}} (multi-map :a 1 :b 2)))
-       (is (= (multi-map :a 1 :b 2) {:a #{1} :b #{2}}))
+                              ([x y & more] (apply eq x y more)))))
+
+   :cljs
+   (set! (.-= cljs.core)
+         (fn ^boolean
+           ([_] true)
+           ([x y]
+            (if (nil? x)
+              (nil? y)
+              (or (identical? x y)
+                  (if (instance? tiara.data.MultiMap y)
+                    ^boolean (-equiv y x)
+                    ^boolean (-equiv x y)))))
+           ([x y & more]
+            (if (= x y)
+              (if (next more)
+                (recur y (first more) (next more))
+                (= y (first more)))
+              false)))))
+
+(deftest test-multi-construct
+  (testing "equalence of multimaps with maps that use set values"
+    (is (= (multi-map :a 1) (multi-map :a 1)))
+    (is (= {:a #{1}} (multi-map :a 1)))
+    (is (= (multi-map :a 1) {:a #{1}}))
+    (is (= {:a #{1} :b #{2}} (multi-map :a 1 :b 2)))
+    (is (= (multi-map :a 1 :b 2) {:a #{1} :b #{2}}))
+    (is (= (multi-map :a 1 :b 2) {:a 1 :b 2}))
+    (is (= {:a 1 :b 2} (multi-map :a 1 :b 2)))
        ;; The following cannot work without the monkey-patch because seq returns multiple pairs,
        ;; not key/set pairs
-       (is (= {:a #{1 3} :b #{2}} (multi-map :a 1 :b 2 :a 3)))
-       (is (= (multi-map :a 1 :b 2 :a 3) {:a #{1 3} :b #{2}})))))
+    (is (= {:a #{1 3} :b #{2}} (multi-map :a 1 :b 2 :a 3)))
+    (is (= (multi-map :a 1 :b 2 :a 3) {:a #{1 3} :b #{2}}))
+    (is (= (multi-map :a 1 :b 2 :a 3) (multi-map :a 1 :b 2 :a 3)))))
 
 (defn mm [[k v]] [k #{v}])
 (defn mmseq [m] (map mm m))
 (def mmmap (map mm))
 
-#?(:clj
-   (deftest test-multi-assoc
-     (testing "equivalence of maps constructed using assoc"
-       (is (= (into {} (map (fn [[k v]] [k #{v}])) (make-map-assoc hash-map))
-              (make-map-assoc multi-map)))
-       (is (= (make-map-assoc multi-map)
-              (into {} mmmap (make-map-assoc hash-map)))))
-     (testing "assoc adds data as expected"
-       (is (= {:a #{1} :b #{2}} (assoc (multi-map :a 1) :b 2))))))
+(deftest test-multi-assoc
+  (testing "equivalence of maps constructed using assoc"
+    (is (= (into {} (map (fn [[k v]] [k #{v}])) (make-map-assoc hash-map))
+           (make-map-assoc multi-map)))
+    (is (= (make-map-assoc multi-map)
+           (into {} mmmap (make-map-assoc hash-map)))))
+  (testing "assoc adds data as expected"
+    (is (= {:a #{1} :b #{2}} (assoc (multi-map :a 1) :b 2)))))
 
-#?(:clj
-   (deftest test-multi-conj
-     (testing "equivalence of maps constructed using conj"
-       (let [kvs (shuffle (map (juxt make-key identity) (range 20)))]
-         (is (= (reduce conj EMPTY_MULTI_MAP kvs)
-                (reduce conj (hash-map) (mmseq kvs))))))))
+(deftest test-multi-conj
+  (testing "equivalence of maps constructed using conj"
+    (let [kvs (shuffle (map (juxt make-key identity) (range 20)))]
+      (is (= (reduce conj EMPTY_MULTI_MAP kvs)
+             (reduce conj (hash-map) (mmseq kvs)))))))
 
-#?(:clj
-   (deftest test-multi-dissoc
-     (testing "dissoc works equivalently to hashmap"
-       (is (= {:a #{1}} (dissoc (multi-map :a 1 :b 2) :b)))
-       (let [rms (take 8 (map make-key (shuffle (range 20))))
-             mhm (into {} mmmap (make-map hash-map))]
-         (is (= (reduce dissoc (make-map multi-map) rms)
-                (reduce dissoc mhm rms))))
-       (is (= {:b #{4}} (dissoc (multi-map :a 1 :a 2 :b 4) :a))))
-     (testing "dissoc works on pairs"
-       (is (= {:a #{1}} (dissoc (multi-map :a 1 :a 2) [:a 2])))
-       (is (= {:a #{1 2}} (dissoc (multi-map :a 1 :a 2 :b 3) [:b 3])))
-       (is (= {:b #{3}} (dissoc (dissoc (multi-map :a 1 :a 2 :b 3) [:a 2]) [:a 1])))
-       (is (= {:a #{1 2} :b #{3}} (dissoc (multi-map :a 1 :a 2 :b 3) [:b 4]))))))
+(deftest test-multi-dissoc
+  (testing "dissoc works equivalently to hashmap"
+    (is (= {:a #{1}} (dissoc (multi-map :a 1 :b 2) :b)))
+    (let [rms (take 8 (map make-key (shuffle (range 20))))
+          mhm (into {} mmmap (make-map hash-map))]
+      (is (= (reduce dissoc (make-map multi-map) rms)
+             (reduce dissoc mhm rms))))
+    (is (= {:b #{4}} (dissoc (multi-map :a 1 :a 2 :b 4) :a))))
+  (testing "dissoc works on pairs"
+    (is (= {:a #{1}} (dissoc (multi-map :a 1 :a 2) [:a 2])))
+    (is (= {:a #{1 2}} (dissoc (multi-map :a 1 :a 2 :b 3) [:b 3])))
+    (is (= {:b #{3}} (dissoc (dissoc (multi-map :a 1 :a 2 :b 3) [:a 2]) [:a 1])))
+    (is (= {:a #{1 2} :b #{3}} (dissoc (multi-map :a 1 :a 2 :b 3) [:b 4])))))
 
-#?(:clj
-   (deftest test-multi-invoke
-     (testing "invoke works as expected"
-       (is (= #{2} ((multi-map :a 1 :b 2) :b)))
-       (let [mp (make-map multi-map)]
-         (doseq [n (shuffle (range 20))]
-           (is (= #{n} (mp (make-key n)))))))))
+(deftest test-multi-invoke
+  (testing "invoke works as expected"
+    (is (= #{2} ((multi-map :a 1 :b 2) :b)))
+    (let [mp (make-map multi-map)]
+      (doseq [n (shuffle (range 20))]
+        (is (= #{n} (mp (make-key n))))))))
 
-#?(:clj
-   (deftest test-multi-find
-     (testing "find works as expected"
-       (is (= [:b #{2}] (find (multi-map :a 1 :b 2) :b)))
-       (let [mp (make-map multi-map)]
-         (doseq [n (shuffle (range 20))]
-           (is (= [(make-key n) #{n}] (find mp (make-key n)))))))))
+(deftest test-multi-find
+  (testing "find works as expected"
+    (is (= [:b #{2}] (find (multi-map :a 1 :b 2) :b)))
+    (let [mp (make-map multi-map)]
+      (doseq [n (shuffle (range 20))]
+        (is (= [(make-key n) #{n}] (find mp (make-key n))))))))
 
-#?(:clj
-   (deftest test-multi-vals
-     (testing "vals returns the correct data"
-       (let [kvs (shuffle (map (juxt make-key identity) (range 20)))
-             mp (reduce conj EMPTY_MULTI_MAP kvs)]
-         (is (= (set (vals mp)) (set (map second kvs)))))
-       (is (= #{1 2 3 4 5 6} (set (vals (multi-map :a 1 :a 2 :a 3 :b 3 :b 4 :c 5 :c 6))))))))
+(deftest test-multi-vals
+  (testing "vals returns the correct data"
+    (let [kvs (shuffle (map (juxt make-key identity) (range 20)))
+          mp (reduce conj EMPTY_MULTI_MAP kvs)]
+      (is (= (set (vals mp)) (set (map second kvs)))))
+    (is (= #{1 2 3 4 5 6} (set (vals (multi-map :a 1 :a 2 :a 3 :b 3 :b 4 :c 5 :c 6)))))))
 
-#?(:clj
-   (deftest test-multi-count
-     (testing "counts are correct"
-       (is (= 5 (count (multi-map :a 1 :a 2 :a 3 :a 4 :a 5))))
-       (is (= 5 (count (multi-map :a 1 :b 2 :c 3 :d 4 :e 5))))
-       (is (= 5 (count (multi-map :a 1 :b 1 :c 1 :d 1 :e 1)))))))
+(deftest test-multi-count
+  (testing "counts are correct"
+    (is (= 5 (count (multi-map :a 1 :a 2 :a 3 :a 4 :a 5))))
+    (is (= 5 (count (multi-map :a 1 :b 2 :c 3 :d 4 :e 5))))
+    (is (= 5 (count (multi-map :a 1 :b 1 :c 1 :d 1 :e 1))))
+    (is (= 5 (count (multi-map :a 1 :a 2 :b 1 :b 2 :b 3))))
+    (is (= 3 (count (multi-map :a 1 :a 1 :b 1 :b 1 :b 3))))))
 
-#?(:clj
-   (deftest test-multi-meta
-     (testing "If metadata survives modifications to the map"
-       (let [m (with-meta (multi-map :a "one") {:doc "data"})]
-         (is (= "data" (:doc (meta (assoc m :b "two")))))
-         (is (= "data" (:doc (meta (dissoc m :a)))))
-         (is (= "data" (:doc (meta (assoc m :b "three")))))
-         (is (= "data" (:doc (meta (dissoc m [:b "two"])))))
-         (is (= "data" (:doc (meta (empty m)))))))))
+(deftest test-multi-seq
+  (testing "sequences are correct"
+    (is (= #{[:a 1] [:a 2] [:a 3] [:a 4] [:a 5]}
+           (set (seq (multi-map :a 1 :a 2 :a 3 :a 4 :a 5)))))
+    (is (= #{[:a 1] [:b 2] [:c 3] [:d 4] [:e 5]}
+           (set (seq (multi-map :a 1 :b 2 :c 3 :d 4 :e 5)))))
+    (is (= #{[:a 1] [:b 1] [:c 1] [:d 1] [:e 1]}
+           (set (seq (multi-map :a 1 :b 1 :c 1 :d 1 :e 1)))))
+    (is (= #{[:a 1] [:a 2] [:b 1] [:b 2] [:b 3]}
+           (set (seq (multi-map :a 1 :a 2 :b 1 :b 2 :b 3)))))
+    (is (= #{[:a 1] [:b 1] [:b 3]}
+           (set (seq (multi-map :a 1 :a 1 :b 1 :b 1 :b 3)))))))
 
-
-   
+(deftest test-multi-meta
+  (testing "If metadata survives modifications to the map"
+    (let [m (with-meta (multi-map :a "one") {:doc "data"})]
+      (is (= "data" (:doc (meta (assoc m :b "two")))))
+      (is (= "data" (:doc (meta (dissoc m :a)))))
+      (is (= "data" (:doc (meta (assoc m :b "three")))))
+      (is (= "data" (:doc (meta (dissoc m [:b "two"])))))
+      (is (= "data" (:doc (meta (empty m))))))))
 
 #?(:cljs (cljs.test/run-tests))
 

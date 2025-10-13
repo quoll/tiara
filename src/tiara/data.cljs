@@ -346,15 +346,19 @@
   (-empty [_] (MultiMap. (with-meta {} (-meta m)) 0 #'cljs.core/empty-unordered-hash))
 
   IEquiv
-  (-equiv [this o]
+  (-equiv [_ o]
     (boolean
-     (and (map? o)
-          (not (record? o))
-          (= (-count this) (count o))
-          (every? (fn [[k v]] (let [ov (get o k sentinel)]
-                                (when-not (identical? ov sentinel)
-                                  (= ov v))))
-                  m))))
+     (if (instance? MultiMap o)
+       (-equiv m (.-m o))
+       (and (map? o)
+            (not (record? o))
+            (= (-count m) (count o))
+            (every? (fn [[k vs]] (let [ov (get o k sentinel)]
+                                   (when-not (identical? ov sentinel)
+                                     (or
+                                      (= vs ov)
+                                      (= vs #{ov})))))
+                    m)))))
 
   IHash
   (-hash [this] (caching-hash this hash-unordered-coll __hash))
@@ -366,8 +370,7 @@
   (-seq [_] (for [[k vs] m v vs] (MapEntry. k v nil)))
 
   IDrop
-  (-drop [_ n] (when-let [s (-seq m)]
-                 (drop n s)))
+  (-drop [this n] (when (-seq m) (drop n (-seq this))))
 
   ICounted
   (-count [_] count*)
@@ -417,7 +420,7 @@
   (-pr-writer [this writer opts] (print-map this #'cljs.core/pr-writer writer opts))
 
   IEditableCollection
-  (-as-transient [_] (transient-multi-map m)))
+  (-as-transient [_] (transient-multi-map (-as-transient m) count*)))
 
 (deftype TransientMultiMap [^:mutable m ^:mutable count*]
   ICounted
@@ -438,13 +441,15 @@
   ITransientAssociative
   (-assoc! [this k v]
     (if-let [vs (-lookup m k)]
-      (let [nvs (-conj vs v)]
-        (when-not (identical? vs nvs)
-          (let [nm (-assoc! m k nvs)]
-            (set! m nm)
-            (set! count* (inc count*)))))
+      (when-not (contains? vs v)
+        (let [nvs (-conj vs v)
+              nm (-assoc! m k nvs)]
+          (when-not (identical? m nm)
+            (set! m nm))
+          (set! count* (inc count*))))
       (let [nm (-assoc! m k #{v})]
-        (set! m nm)
+        (when-not (identical? m nm)
+          (set! m nm))
         (set! count* (inc count*))))
     this)
 
@@ -454,16 +459,18 @@
                      (map-entry? entry) [(-key entry) (-val entry)]
                      (and (vector? entry) (= 2 (count entry))) [(first entry) (second entry)])]
       (when-let [vs (m k)]
-        (let [vsn (-disjoin vs v)]
-          (when-not (identical? vsn vs)
-            (let [nm (if (seq vsn)
-                       (.assoc! m k vsn)
-                       (.without! m k))]
-              (set! m nm)
-              (set! count* (dec count*))))))
+        (when (contains? vs v)
+          (let [vsn (-disjoin vs v)
+                nm (if (seq vsn)
+                     (-assoc! m k vsn)
+                     (-dissoc! m k))]
+            (when-not (identical? m nm)
+              (set! m nm))
+            (set! count* (dec count*)))))
       (when-let [vs (-lookup m entry)]
-        (let [nm (.without! m entry)]
-          (set! m nm)
+        (let [nm (-dissoc! m entry)]
+          (when-not (identical? m nm)
+            (set! m nm))
           (set! count* (- count* (-count vs))))))
     this)
 
@@ -472,8 +479,8 @@
   (-invoke [this k not-found] (-lookup this k not-found)))
 
 (defn transient-multi-map
-  [m]
-  (TransientMultiMap. m (count m)))
+  [m c]
+  (TransientMultiMap. m c))
 
 (def EMPTY_MULTI_MAP (MultiMap. {} 0 #'cljs.core/empty-unordered-hash))
 
@@ -482,4 +489,4 @@
   ([] EMPTY_MULTI_MAP)
   ([& keyvals]
    (let [kvs (partition 2 keyvals)]
-     (into EMPTY_MULTI_MAP (map #(MapEntry. (key %) (val %) nil)) kvs))))
+     (into EMPTY_MULTI_MAP (map #(MapEntry. (first %) (second %) nil)) kvs))))
