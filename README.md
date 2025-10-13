@@ -1,21 +1,27 @@
 # Tiara
-A small data structure library of ordered maps and sets in Clojure and ClojureScript.
+A small data structure library of maps and sets in Clojure and ClojureScript.
+
+Include ordered maps and sets, and multimaps.
 
 ### deps.edn
 
 Add the following dependency to the :deps map in deps.edn:
 
 ```clojure
-org.clojars.quoll/tiara {:mvn/version "0.4.0"}
+org.clojars.quoll/tiara {:mvn/version "0.5.0"}
 ```
 
 ### Leiningen/Boot
 ```clojure
-[org.clojars.quoll/tiara "0.4.0"]
+[org.clojars.quoll/tiara "0.5.0"]
 ```
 
 ## Usage
-At this point, Tiara only includes an ordered map and an ordered set. These have the same O(1) access characteristics as hashmaps/hashsets, but maintain insertion order. However, `dissoc` and `disj` will be o(n) in the worst case.
+Tiara includes a multimap, an ordered map and an ordered set.
+
+### Ordered Map and Ordered Set
+
+The ordered structures have the same O(1) access characteristics as hashmaps/hashsets, but maintain insertion order. However, `dissoc` and `disj` will be o(n) in the worst case.
 
 Ordered Maps behave the same as other maps, but are only created using the `ordered-map` function.
 
@@ -57,7 +63,67 @@ Ordered Sets are the same as other sets, but can be created using `ordered-set` 
 
 ```
 
+### Multimap
+Multimaps offer a convenience of mapping keys to sets of values, rather than to a single value.
+
+Calling `assoc` works as usual, with the exception that values are not replaced when the same key is added multiple times:
+
+```clojure
+(require '[tiara.data :refer [multi-map]])
+
+(def mm (multi-map :a 1 :b 2 :b 3))
+
+(= mm {:a #{1} :b #{2 3}})  ;; => true
+(seq mm)                    ;; => ([:a 1] [:b 2] [:b 3])
+
+(get mm :a)                 ;; => #{1}
+(get mm :b)                 ;; => #{2 3}
+```
+
+#### Equality
+Equality comes with some caveats, however. A multi-map can appear first in an equality statement, but not second:
+
+```clojure
+(= {:a #{1} :b #{2 3}} mm)  ;; => false
+```
+This can only be addressed by monkey-patching `clojure.core/=`, but no one wants that. (See [`tiara.data-test`](https://github.com/quoll/tiara/blob/f763bf47e4200815e885425c73c3290ba3c64409/test/tiara/data_test.cljc#L235-L259) for an example of how to do this).
+
+#### Removals
+A standard `dissoc` will remove everything associated with a key. This makes removing a single value for a given key a little awkward:
+
+```clojure
+(def mm (multi-map :a 1 :b 2 :b 3))
+(let [s (get mm :b)]
+  (-> mm
+      (dissoc :b)
+      (assoc :b (disj s 3))))
+```
+
+Instead, the `dissoc` function can also accept a key/value pair (or a `MapEntry` object):
+
+```clojure
+(dissoc mm [:b 3])
+```
+
+This is the same type of argument accepted by `conj`. Symmetry might suggest using `disj` for removing, but that would require multi maps to be sets, which would seem to be semantically dissimilar.
+
+Note: This is up for debate. I've implemented `MultiMap` as a set with `disj` and it works fine. But it means that instances become instances of `IPersistentSet` which has some small impact on behavior. For instance, `(set (multi-map :a 1))` will return the multipay, rather than a seq of the entries.
+
+#### Lack of Updates
+For now, updates are not possible. This is because `clojure.core/update` retrieves a value, modifies it, and uses `assoc` to add it back in. However, since the values are sets, then updating functions need to process the entire set. Re-associating a new set is difficult, as this would become a new value along with all the other values referenced by that key.
+
+Updating must be done manually via:
+```clojure
+(let [s (get mm :b)]
+  (-> mm
+      (dissoc :b)
+      (assoc :b (map update-fn s))))
+```
+
+One future option is to include updated functions for accomplishing this more easily. Another approach is to use an internal Set type, and for insertions of sets of this type to replace the set rather than being added as an element to it. Feedback would be appreciated.
+
 ## Motivation
+### Ordered Sets and Maps
 I often encounter cases where I need to append data to a structure that will be written out in the same order it was read. However, duplicates of a simple piece of data should not be duplicated, or for more complex data, they should be merged with previously encountered information. These ordered sets and maps are ideal for this operation.
 
 While it would be possible to use Java's [LinkedHashMap](https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/util/LinkedHashMap.html) and [LinkedHashSets](https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/util/LinkedHashSet.html), these are not immutable structures, and hence are not ideal for functional programming. I suspected that an immutable equivalent may have existed, but the required functionality did not appear difficult and I thought it would be an interesting learning experience to write my own version.
@@ -66,10 +132,10 @@ In fact, there were already existing libraries (found by [Tom Dalziel](https://g
 - [Ordered](https://github.com/clj-commons/ordered)
 - [Linked](https://github.com/frankiesardo/linked)
 
-## Comparison
+#### Comparison
 All 3 implementations use a backing hashmap. Hashmaps use a hash-trie structure to find entries by key, though these are amalgamated over several entries, with one tree node being shared by up to 32 entries. Since these are common to all 3 systems, and incur a small overhead per entry, the overall space used by these maps can be considered as roughly the same between systems.
 
-### Tiara
+##### Tiara
 Tiara uses a backing hashmap and a backing vector. When a key/value is stored, then a [`MapEntry`](https://github.com/clojure/clojure/blob/master/src/jvm/clojure/lang/MapEntry.java) is created and stored at the end of the vector. The size of the vector (and hence, the location of this new entry) is then stored with the key in the hashmap.
 
 Each entry therefore uses a standard `MapEntry` for the key/location pair in the backing map, and a second `MapEntry` for the `key/value` pair in the vector.
@@ -80,7 +146,7 @@ Removing an entry is an expensive operation. The location in the vector is found
 
 Finally, the seq of the map is already available as the vector, so this can be returned with no work required.
 
-### Ordered
+##### Ordered
 This is a similar structure to Tiara, using a hashmap for fast indexing, and a vector to store the order.
 
 The hashmap entries consist of a nested [`MapEntry`](https://github.com/clojure/clojure/blob/master/src/jvm/clojure/lang/MapEntry.java) pair. Maps usually store a single key/value entry, but in this case the value is another `MapEntry`. This inner `MapEntry` contains the value for the key, and the index to find the value in the vector. The vector also contains another `MapEntry` object, this time containing the key/value pair. This therefore needs 3 `MapEntry` objects per insertion.
@@ -91,7 +157,7 @@ Removing an entry is done by removing the entry from the backing hashmap, and se
 
 The seq of an Ordered map is based on filtering the nils out of the backing vector. The filtering is lazy, and not a significant cost when compared to whatever is using the seq.
 
-### Linked
+##### Linked
 This is a significantly different data structure. Each entry is given a node that contains the value, along with references to `left` and `right`. These are the key values to find nodes before and after them, which is an indirection for creating a doubly-linked list. (Indirection is needed for doubly-linked lists in functional data structures, since second updates to nodes will not update any references to the node). The linked list is circular, to allow iteration both forward and back, starting from the stored head of the list.
 
 Storage requires the default `MapEntry` in the backing hashmap, along with a `Node` object that will go to the tail position of the list. This node will set the `right` pointer to the head, and the `left` reference to the previous `tail`. The head must set its `left` to point to the new tail, and the previous tail must update its `right` reference to point to this new tail. Due to indirection, this means looking up the existing `head` and `tail` and then setting their `left` and `right` references, respectively. This is a lot of updates to the backing map, and incurs a significant cost.
@@ -102,9 +168,11 @@ Removal is similar to insertion, in that the node can be found by a lookup in th
 
 The ordered seq can be built out of the nodes using their linked list. However, due to each node holding only the key of the next node in the list, this means that every step in the iteration requires a map lookup.
 
+### MultiMaps
+Multi maps are a common data structure, and one that I have needed on many occasions. While mapping keys to sets of values is very common, this suffers from a lack of composability, and cannot be used with operations like `into` that work on transient variations. This multi-map implementation was written specifically to address these two issues.
 
 ## Tests
-Some simple [Criterium](https://github.com/hugoduncan/criterium) tests demonstrate the performance differences between these 3 implementations. To minimize the non-map working being performed, only numbers are being stored as keys and values.
+Some simple [Criterium](https://github.com/hugoduncan/criterium) tests demonstrate the performance differences between the 3 ordered structure implementations. To minimize the non-map working being performed, only numbers are being stored as keys and values.
 
 To avoid access patterns, the initial data was generated with:
 
@@ -196,8 +264,12 @@ Both Linked and Tiara seem to have better memory consumption profiles than Order
 
 For access patterns that do not require significant removals, then Tiara should provide some benefits.
 
+
+## Future Work
+- MultiMaps may use internal set implementations to allow operations like `update` to work.
+
 ## License
 
-Copyright © 2023, 2024 Paula Gearon
+Copyright © 2023-2025 Paula Gearon
 
 Distributed under the Eclipse Public License version 2.0.
