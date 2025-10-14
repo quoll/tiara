@@ -107,7 +107,7 @@ Instead, the `dissoc` function can also accept a key/value pair (or a `MapEntry`
 
 This is the same type of argument accepted by `conj`. Symmetry might suggest using `disj` for removing, but that would require multi maps to be sets, which would seem to be semantically dissimilar.
 
-Note: This is up for debate. I've implemented `MultiMap` as a set with `disj` and it works fine. But it means that instances become instances of `IPersistentSet` which has some small impact on behavior. For instance, `(set (multi-map :a 1))` will return the multipay, rather than a seq of the entries.
+**Note:** This is up for debate. I've implemented `MultiMap` as a set with `disj` and it works fine. But it means that instances become instances of `IPersistentSet` which has some small impact on behavior. For instance, `(set (multi-map :a 1))` will return the multimap, rather than a seq of the entries. Also, `print-method` needs `IPersistentMap` to be prioritized over `IPersistentSet`.
 
 #### Lack of Updates
 For now, updates are not possible. This is because `clojure.core/update` retrieves a value, modifies it, and uses `assoc` to add it back in. However, since the values are sets, then updating functions need to process the entire set. Re-associating a new set is difficult, as this would become a new value along with all the other values referenced by that key.
