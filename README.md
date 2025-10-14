@@ -80,6 +80,18 @@ Calling `assoc` works as usual, with the exception that values are not replaced 
 (get mm :b)                 ;; => #{2 3}
 ```
 
+#### Reversing
+Sometimes it can be useful to reverse the direction of a map. For instance, if a map encodes a directed graph structure, and you want to reverse the direction of the edges.
+
+```clojure
+(def reverser (map (fn [[k v]] [v k])))
+
+(def mm (into (multi-map) reverser {:a :b, :b :e, :c :d, :d :e}))
+;; mm => {:b :a, :d :c, :e :d, :e :b}
+(into {} reverser mm)
+;;    => {:a :b, :b :e, :c :d, :d :e}
+```
+
 #### Equality
 Equality comes with some caveats, however. A multi-map can appear first in an equality statement, but not second:
 
