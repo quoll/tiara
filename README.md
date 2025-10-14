@@ -80,10 +80,23 @@ Calling `assoc` works as usual, with the exception that values are not replaced 
 (get mm :b)                 ;; => #{2 3}
 ```
 
+#### Reversing
+Sometimes it can be useful to reverse the direction of a map. For instance, if a map encodes a directed graph structure, and you want to reverse the direction of the edges.
+
+```clojure
+(def reverser (map (fn [[k v]] [v k])))
+
+(def mm (into (multi-map) reverser {:a :b, :b :e, :c :d, :d :e}))
+;; mm => {:b :a, :d :c, :e :d, :e :b}
+(into {} reverser mm)
+;;    => {:a :b, :b :e, :c :d, :d :e}
+```
+
 #### Equality
 Equality comes with some caveats, however. A multi-map can appear first in an equality statement, but not second:
 
 ```clojure
+(= mm {:a #{1} :b #{2 3}})  ;; => true
 (= {:a #{1} :b #{2 3}} mm)  ;; => false
 ```
 This can only be addressed by monkey-patching `clojure.core/=`, but no one wants that. (See [`tiara.data-test`](https://github.com/quoll/tiara/blob/f763bf47e4200815e885425c73c3290ba3c64409/test/tiara/data_test.cljc#L235-L259) for an example of how to do this).
@@ -107,7 +120,7 @@ Instead, the `dissoc` function can also accept a key/value pair (or a `MapEntry`
 
 This is the same type of argument accepted by `conj`. Symmetry might suggest using `disj` for removing, but that would require multi maps to be sets, which would seem to be semantically dissimilar.
 
-Note: This is up for debate. I've implemented `MultiMap` as a set with `disj` and it works fine. But it means that instances become instances of `IPersistentSet` which has some small impact on behavior. For instance, `(set (multi-map :a 1))` will return the multipay, rather than a seq of the entries.
+**Note:** This is up for debate. I've implemented `MultiMap` as a set with `disj` and it works fine. But it means that instances become instances of `IPersistentSet` which has some small impact on behavior. For instance, `(set (multi-map :a 1))` will return the original multimap, rather than a set of the key/value entries. Also, `print-method` needs `IPersistentMap` to be prioritized over `IPersistentSet`.
 
 #### Lack of Updates
 For now, updates are not possible. This is because `clojure.core/update` retrieves a value, modifies it, and uses `assoc` to add it back in. However, since the values are sets, then updating functions need to process the entire set. Re-associating a new set is difficult, as this would become a new value along with all the other values referenced by that key.
