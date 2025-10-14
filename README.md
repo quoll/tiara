@@ -96,6 +96,7 @@ Sometimes it can be useful to reverse the direction of a map. For instance, if a
 Equality comes with some caveats, however. A multi-map can appear first in an equality statement, but not second:
 
 ```clojure
+(= mm {:a #{1} :b #{2 3}})  ;; => true
 (= {:a #{1} :b #{2 3}} mm)  ;; => false
 ```
 This can only be addressed by monkey-patching `clojure.core/=`, but no one wants that. (See [`tiara.data-test`](https://github.com/quoll/tiara/blob/f763bf47e4200815e885425c73c3290ba3c64409/test/tiara/data_test.cljc#L235-L259) for an example of how to do this).
