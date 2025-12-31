@@ -1,7 +1,7 @@
 (ns tiara.data-test
   (:require [clojure.test :refer [deftest testing is]]
             [tiara.data :refer [ordered-map EMPTY_MAP ordered-set oset EMPTY_SET
-                                multi-map EMPTY_MULTI_MAP]]))
+                                ordered? multi-map EMPTY_MULTI_MAP]]))
 
 #?(:clj (set! *warn-on-reflection* true))
 
@@ -134,7 +134,24 @@
     (let [m (ordered-map :a 1 :b 2 :c 3 :a 4 :d 5 :e 6 :f 7 :h 8 :i 9 :j 10)]
       (is (= {:a 4 :b 2 :c 3 :d 5 :e 6 :f 7 :h 8 :i 9 :j 10} m))
       (is (= [[:a 4] [:b 2] [:c 3] [:d 5] [:e 6]
-              [:f 7] [:h 8] [:i 9] [:j 10]] (seq m))))))
+              [:f 7] [:h 8] [:i 9] [:j 10]] (seq m)))))
+  (testing "Copy constructor returns an equivalent ordered map"
+    (let [m {:a 1 :b 2 :c 3 :d 4 :e 5 :f 6 :g 7 :h 8 :i 9}
+          om (ordered-map m)]
+      (testing "Copying from unordered map creates an ordered map"
+        (is (= om m))
+        (is (not (identical? om m))))
+      (testing "Copying from ordered map is an identity function"
+        (is (= om (ordered-map om)))
+        (is (identical? om (ordered-map om)))))))
+
+(deftest test-map-types
+  (testing "Ordered maps are identified as ordered"
+    (is (ordered? (ordered-map :a 1 :b 2)))
+    (is (ordered? (ordered-map {:a 1 :b 2})))
+    (is (not (ordered? (hash-map :a 1 :b 2))))
+    (is (not (ordered? {:a 1 :b 2})))
+    (is (ordered? (transient (ordered-map :a 1 :b 2))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Set testing
@@ -219,6 +236,12 @@
 (deftest test-set-strings
   (testing "If the str function works on sets"
     (is (= "#{:a :b}" (str (ordered-set :a :b))))))
+
+(deftest test-set
+  (testing "Ordered sets are identified as ordered"
+    (is (ordered? (ordered-set :a :b)))
+    (is (not (ordered? #{:a :b})))
+    (is (ordered? (transient (ordered-set :a :b))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; MultiMap testing

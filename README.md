@@ -8,16 +8,16 @@ Include ordered maps and sets, and multimaps.
 Add the following dependency to the :deps map in deps.edn:
 
 ```clojure
-org.clojars.quoll/tiara {:mvn/version "0.5.0"}
+org.clojars.quoll/tiara {:mvn/version "0.5.1"}
 ```
 
 ### Leiningen/Boot
 ```clojure
-[org.clojars.quoll/tiara "0.5.0"]
+[org.clojars.quoll/tiara "0.5.1"]
 ```
 
 ## Usage
-Tiara includes a multimap, an ordered map and an ordered set.
+Tiara includes a multimap, an ordered map and an ordered set. Usage is identical in Clojure and ClojureScript.
 
 ### Ordered Map and Ordered Set
 
@@ -27,8 +27,10 @@ Ordered Maps behave the same as other maps, but are only created using the `orde
 
 Ordered Sets are the same as other sets, but can be created using `ordered-set` when passing the set's contents as arguments, or `oset` when passing the contents in a seq.
 
+An additional `ordered?` function is also provided to indicate if a map/set is ordered and will stay ordered after being added to (`PersistentArrayMap` _is_ ordered, but will lose ordering when `assoc` takes it over 8 entries).
+
 ```clojure
-(require '[tiara.data :refer [ordered-map ordered-set oset]])
+(require '[tiara.data :refer [ordered-map ordered-set oset ordered?]])
 
 ;; maps
 (def m (ordered-map :a 1 :b 2 :c 3 :d 4 :e 5))
@@ -44,6 +46,8 @@ Ordered Sets are the same as other sets, but can be created using `ordered-set` 
   ;; to append, then remove first:
 (assoc (dissoc m :c) :c 7)  ;; => {:a 1, :b 2, :d 4, :e 5, :c 7}
 
+(ordered? m)  ;; => true
+(ordered? h)  ;; => false
 
 ;; sets
 (def os (ordered-set :a :b :c :d :e :f :g :h :i))
@@ -61,6 +65,8 @@ Ordered Sets are the same as other sets, but can be created using `ordered-set` 
   ;; to move to the end, remove and add
 (conj (disj os :d) :d)  ;; => #{:a :b :c :e :f :g :h :i :d}
 
+(ordered? os)  ;; => true
+(ordered? hs)  ;; => false
 ```
 
 ### Multimap
@@ -144,6 +150,7 @@ Multi maps are a common data structure, and one that I have needed on many occas
 
 ## Future Work
 - MultiMaps may use internal set implementations to allow operations like `update` to work.
+- Create an OrderedMultiMap.
 
 ## License
 

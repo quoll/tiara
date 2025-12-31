@@ -120,8 +120,10 @@
 (defn ordered-map
   "Creates a map object that remembers the insertion order, similarly to a java.util.LinkedHashMap"
   ([] EMPTY_MAP)
-  ([& keyvals]
-   (let [m (apply hash-map keyvals)
+  ([m] (if (instance? VecMap m) m (into EMPTY_MAP (seq m))))
+  ([fk fv & keyvals]
+   (let [keyvals (concat [fk fv] keyvals)
+         m (apply hash-map keyvals)
          ks (if (= (* 2 (count m)) (count keyvals))
               (take-nth 2 keyvals) 
               (into [] (comp (take-nth 2) (distinct)) keyvals))]
@@ -316,6 +318,23 @@
 (defn transient-ordered-set
   [os]
   (TransientVecSet. (-as-transient os)))
+
+(defprotocol Ordered
+  (ordered? [this] "Indicates if the data structure is ordered"))
+
+(extend-protocol Ordered
+  VecMap
+  (ordered? [_] true)
+  TransientVecMap
+  (ordered? [_] true)
+  VecSet
+  (ordered? [_] true)
+  TransientVecSet
+  (ordered? [_] true)
+  object
+  (ordered? [_] false)
+  nil
+  (ordered? [_] false))
 
 (deftype MultiMap [m count* ^:mutable __hash]
   Object
